@@ -1,0 +1,288 @@
+#include <ESP8266WiFi.h>
+#include <ESP8266WebServer.h>
+#include <DNSServer.h>
+#include <EEPROM.h>
+
+#define EEPROM_SIZE 96
+#define SSID_ADDR 0
+#define PASS_ADDR 32
+
+const byte DNS_PORT = 53;
+
+ESP8266WebServer server(80);
+DNSServer dnsServer;
+
+String savedSSID = "";
+String savedPASS = "";
+
+bool apMode = false;
+
+String readEEPROMString(int start, int maxLen) {
+  String value = "";
+  for (int i = 0; i < maxLen; i++) {
+    char c = char(EEPROM.read(start + i));
+    if (c == '\0' || c == 255) break;
+    value += c;
+  }
+  return value;
+}
+
+void writeEEPROMString(int start, int maxLen, String data) {
+  for (int i = 0; i < maxLen; i++) {
+    if (i < data.length()) {
+      EEPROM.write(start + i, data[i]);
+    } else {
+      EEPROM.write(start + i, 0);
+    }
+  }
+}
+
+void saveWiFiCredentials(String ssid, String pass) {
+  writeEEPROMString(SSID_ADDR, 32, ssid);
+  writeEEPROMString(PASS_ADDR, 64, pass);
+  EEPROM.commit();
+}
+
+void loadWiFiCredentials() {
+  savedSSID = readEEPROMString(SSID_ADDR, 32);
+  savedPASS = readEEPROMString(PASS_ADDR, 64);
+}
+
+void clearWiFiCredentials() {
+  for (int i = 0; i < EEPROM_SIZE; i++) {
+    EEPROM.write(i, 0);
+  }
+  EEPROM.commit();
+}
+
+bool connectToSavedWiFi() {
+  if (savedSSID.length() == 0) {
+    Serial.println("Nenhum Wi-Fi salvo.");
+    return false;
+  }
+
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(savedSSID.c_str(), savedPASS.c_str());
+
+  Serial.println("Tentando conectar ao Wi-Fi salvo...");
+  Serial.print("SSID salvo: ");
+  Serial.println(savedSSID);
+
+  int tentativas = 0;
+  while (WiFi.status() != WL_CONNECTED && tentativas < 20) {
+    delay(500);
+    Serial.print(".");
+    tentativas++;
+  }
+
+  Serial.println();
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("Conectado com sucesso!");
+    Serial.print("IP do ESP: ");
+    Serial.println(WiFi.localIP());
+    return true;
+  }
+
+  Serial.println("Falha ao conectar no Wi-Fi salvo.");
+  return false;
+}
+
+String getHtmlPage(String msg = "") {
+  String html = R"rawliteral(
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Configuração Wi-Fi ESP</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f3f4f6;
+      margin: 0;
+      padding: 20px;
+    }
+    .box {
+      max-width: 420px;
+      margin: 40px auto;
+      background: white;
+      padding: 24px;
+      border-radius: 14px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+    }
+    h2 {
+      margin-top: 0;
+    }
+    input {
+      width: 100%;
+      padding: 12px;
+      margin-top: 6px;
+      margin-bottom: 16px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      box-sizing: border-box;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      background: #2563eb;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #1d4ed8;
+    }
+    .msg {
+      background: #eef6ff;
+      border: 1px solid #bfdbfe;
+      color: #1e3a8a;
+      padding: 10px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+    }
+    .danger {
+      display: inline-block;
+      margin-top: 14px;
+      color: #b91c1c;
+      text-decoration: none;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h2>Configurar Wi-Fi</h2>
+)rawliteral";
+
+  if (msg.length() > 0) {
+    html += "<div class='msg'>" + msg + "</div>";
+  }
+
+  html += R"rawliteral(
+    <form action="/save" method="POST">
+      <label>Nome da rede (SSID)</label>
+      <input type="text" name="ssid" required>
+
+      <label>Senha</label>
+      <input type="password" name="pass" required>
+
+      <button type="submit">Salvar e conectar</button>
+    </form>
+
+    <a class="danger" href="/reset">Apagar Wi-Fi salvo</a>
+  </div>
+</body>
+</html>
+)rawliteral";
+
+  return html;
+}
+
+void handleRoot() {
+  server.send(200, "text/html", getHtmlPage());
+}
+
+void handleSave() {
+  String newSSID = server.arg("ssid");
+  String newPASS = server.arg("pass");
+
+  if (newSSID.length() == 0) {
+    server.send(400, "text/html", getHtmlPage("SSID inválido."));
+    return;
+  }
+
+  saveWiFiCredentials(newSSID, newPASS);
+
+  String html = R"rawliteral(
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Salvo</title>
+</head>
+<body style="font-family: Arial; padding: 20px;">
+  <h2>Dados salvos com sucesso.</h2>
+  <p>O ESP vai reiniciar e tentar se conectar ao Wi-Fi informado.</p>
+</body>
+</html>
+)rawliteral";
+
+  server.send(200, "text/html", html);
+
+  delay(1500);
+  ESP.restart();
+}
+
+void handleReset() {
+  clearWiFiCredentials();
+  server.send(200, "text/html",
+    "<html><body><h2>Wi-Fi apagado.</h2><p>Reiniciando...</p></body></html>");
+  delay(1500);
+  ESP.restart();
+}
+
+void handleNotFound() {
+  server.send(200, "text/html", getHtmlPage());
+}
+
+void startConfigPortal() {
+  apMode = true;
+
+  WiFi.disconnect(true);
+  delay(500);
+
+  WiFi.mode(WIFI_AP);
+  WiFi.softAP("AquaAlert_Config", "12345678");
+
+  IPAddress apIP = WiFi.softAPIP();
+
+  Serial.println("Modo configuracao iniciado.");
+  Serial.print("IP do portal: ");
+  Serial.println(apIP);
+
+  dnsServer.start(DNS_PORT, "*", apIP);
+
+  server.on("/", handleRoot);
+  server.on("/save", HTTP_POST, handleSave);
+  server.on("/reset", handleReset);
+
+  server.on("/generate_204", handleRoot);     // Android
+  server.on("/fwlink", handleRoot);           // Windows
+  server.on("/hotspot-detect.html", handleRoot); // Apple
+  server.onNotFound(handleNotFound);
+
+  server.begin();
+
+  Serial.println("Portal web iniciado.");
+  Serial.println("Conecte no Wi-Fi: AquaAlert_Config");
+  Serial.println("Senha: 12345678");
+}
+
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
+
+  EEPROM.begin(EEPROM_SIZE);
+  loadWiFiCredentials();
+
+  Serial.println();
+  Serial.println("Inicializando ESP...");
+
+  bool connected = connectToSavedWiFi();
+
+  if (!connected) {
+    startConfigPortal();
+  }
+}
+
+void loop() {
+  if (apMode) {
+    dnsServer.processNextRequest();
+    server.handleClient();
+  }
+}
