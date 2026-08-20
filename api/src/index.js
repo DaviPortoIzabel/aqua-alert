@@ -68,7 +68,25 @@ async function createDevice(ownerId, env) {
   const id = newDeviceId();
   const key = randomText(32);
   await env.DB.prepare("INSERT INTO devices (id, name, owner_id, device_key_hash) VALUES (?, ?, ?, ?)").bind(id, "Meu ESP", ownerId, await sha256(key)).run();
-  return { id, name: "Meu ESP", api_key: key };
+  return { name: "Meu ESP", api_key: key };
+}
+
+function resetCode() { return String(crypto.getRandomValues(new Uint32Array(1))[0] % 1000000).padStart(6, "0"); }
+async function resetCodeHash(userId, code, env) { return sha256(`${userId}:${code}:${env.AUTH_SECRET}`); }
+
+async function sendResetEmail(user, code, env) {
+  if (!env.BREVO_API_KEY || !env.BREVO_SENDER_EMAIL) return false;
+  const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: { "accept": "application/json", "api-key": env.BREVO_API_KEY, "content-type": "application/json" },
+    body: JSON.stringify({
+      sender: { name: env.BREVO_SENDER_NAME || "Aqua Alert", email: env.BREVO_SENDER_EMAIL },
+      to: [{ email: user.email, name: user.name }],
+      subject: "Código para redefinir sua senha — Aqua Alert",
+      htmlContent: `<p>Olá, ${user.name}.</p><p>Use este código para redefinir sua senha no Aqua Alert:</p><p style="font-size:28px;font-weight:700;letter-spacing:5px">${code}</p><p>Ele expira em 15 minutos. Se você não pediu a alteração, ignore este e-mail.</p>`,
+    }),
+  });
+  return response.ok;
 }
 
 async function register(request, env) {
@@ -90,6 +108,37 @@ async function login(request, env) {
   return json({ token: await createSession(user, env), user: { name: user.name, email: user.email } });
 }
 
+async function forgotPassword(request, env) {
+  const body = await parseJson(request); const email = body?.email?.trim().toLowerCase();
+  const neutralResponse = { ok: true, message: "Se houver uma conta com este e-mail, enviaremos um código de verificação." };
+  if (!validEmail(email)) return json(neutralResponse);
+  const user = await env.DB.prepare("SELECT id, name, email FROM users WHERE email = ?").bind(email).first();
+  if (!user) return json(neutralResponse);
+  const attempts = await env.DB.prepare("SELECT COUNT(*) AS count FROM password_reset_codes WHERE user_id = ? AND created_at > datetime('now', '-1 hour')").bind(user.id).first();
+  if (Number(attempts.count) >= 3) return json(neutralResponse);
+  const code = resetCode(); const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+  const inserted = await env.DB.prepare("INSERT INTO password_reset_codes (user_id, code_hash, expires_at) VALUES (?, ?, ?)").bind(user.id, await resetCodeHash(user.id, code, env), expiresAt).run();
+  if (!await sendResetEmail(user, code, env)) {
+    await env.DB.prepare("DELETE FROM password_reset_codes WHERE id = ?").bind(inserted.meta.last_row_id).run();
+    return json({ error: "Não foi possível enviar o e-mail agora. Tente novamente em alguns minutos." }, 503);
+  }
+  return json(neutralResponse);
+}
+
+async function resetPassword(request, env) {
+  const body = await parseJson(request); const email = body?.email?.trim().toLowerCase(); const code = body?.code?.trim(); const password = body?.password;
+  if (!validEmail(email) || !/^\d{6}$/.test(code || "") || typeof password !== "string" || password.length < 8 || password.length > 128) return json({ error: "Informe e-mail, código de 6 dígitos e uma senha de pelo menos 8 caracteres." }, 400);
+  const user = await env.DB.prepare("SELECT id FROM users WHERE email = ?").bind(email).first();
+  if (!user) return json({ error: "Código inválido ou expirado." }, 400);
+  const reset = await env.DB.prepare("SELECT id FROM password_reset_codes WHERE user_id = ? AND code_hash = ? AND used_at IS NULL AND expires_at > ? ORDER BY id DESC LIMIT 1").bind(user.id, await resetCodeHash(user.id, code, env), new Date().toISOString()).first();
+  if (!reset) return json({ error: "Código inválido ou expirado." }, 400);
+  await env.DB.batch([
+    env.DB.prepare("UPDATE users SET password_hash = ? WHERE id = ?").bind(await hashPassword(password), user.id),
+    env.DB.prepare("UPDATE password_reset_codes SET used_at = CURRENT_TIMESTAMP WHERE user_id = ? AND used_at IS NULL").bind(user.id),
+  ]);
+  return json({ ok: true, message: "Senha atualizada. Agora entre com a nova senha." });
+}
+
 async function me(request, env) {
   const result = await requireDevice(request, env); if (result.response) return result.response;
   return json({ user: result.user, device: result.device });
@@ -104,10 +153,10 @@ async function rotateDeviceKey(request, env) {
 
 async function postReading(request, env) {
   const body = await parseJson(request);
-  if (!body || !validDeviceId(body.device_id)) return json({ error: "device_id inválido." }, 400);
+  if (!body) return json({ error: "Envie os dados de leitura em JSON." }, 400);
   const deviceKey = request.headers.get("X-Device-Key");
   if (!deviceKey) return unauthorized();
-  const device = await env.DB.prepare("SELECT id FROM devices WHERE id = ? AND device_key_hash = ?").bind(body.device_id, await sha256(deviceKey)).first();
+  const device = await env.DB.prepare("SELECT id FROM devices WHERE device_key_hash = ?").bind(await sha256(deviceKey)).first();
   if (!device) return unauthorized();
   const flow = body.fluxo ?? body.flow_lpm; let liters = body.litros;
   if (liters === undefined && Number.isFinite(Number(flow))) liters = Number(flow) * Number(body.intervalo_segundos ?? 5) / 60;
@@ -117,14 +166,14 @@ async function postReading(request, env) {
   if (Number.isNaN(measured.getTime())) return json({ error: "medido_em inválido." }, 400);
   const measuredAt = saoPauloDateTime(measured);
   await env.DB.prepare("INSERT INTO readings (device_id, measured_at, liters, flow_lpm) VALUES (?, ?, ?, ?)").bind(device.id, measuredAt, liters, Number.isFinite(Number(flow)) ? Number(flow) : null).run();
-  return json({ ok: true, device_id: device.id, liters, measured_at: measuredAt }, 201);
+  return json({ ok: true, liters, measured_at: measuredAt }, 201);
 }
 
 async function dashboardToday(request, env) {
   const result = await requireDevice(request, env); if (result.response) return result.response;
   const today = dateKey(new Date());
   const data = await env.DB.prepare("SELECT COALESCE(SUM(liters), 0) AS total_litros FROM readings WHERE device_id = ? AND substr(measured_at, 1, 10) = ?").bind(result.device.id, today).first();
-  return json({ device_id: result.device.id, date: today, total_litros: Number(data.total_litros) });
+  return json({ date: today, total_litros: Number(data.total_litros) });
 }
 
 async function dashboardDaily(request, env) {
@@ -142,7 +191,7 @@ async function dashboardWeekly(request, env) {
 
 async function history(request, env) {
   const result = await requireDevice(request, env); if (result.response) return result.response;
-  const rows = await env.DB.prepare("SELECT substr(measured_at, 1, 10) AS dia, device_id, ROUND(SUM(liters), 3) AS total_litros, MAX(measured_at) AS ultima_atualizacao FROM readings WHERE device_id = ? GROUP BY dia, device_id ORDER BY dia DESC LIMIT 90").bind(result.device.id).all();
+  const rows = await env.DB.prepare("SELECT substr(measured_at, 1, 10) AS dia, ROUND(SUM(liters), 3) AS total_litros, MAX(measured_at) AS ultima_atualizacao FROM readings WHERE device_id = ? GROUP BY dia ORDER BY dia DESC LIMIT 90").bind(result.device.id).all();
   return json(rows.results);
 }
 
@@ -152,6 +201,8 @@ export default { async fetch(request, env) {
   if (request.method === "GET" && path === "/health") return json({ ok: true });
   if (request.method === "POST" && path === "/api/auth/register") return register(request, env);
   if (request.method === "POST" && path === "/api/auth/login") return login(request, env);
+  if (request.method === "POST" && path === "/api/auth/forgot-password") return forgotPassword(request, env);
+  if (request.method === "POST" && path === "/api/auth/reset-password") return resetPassword(request, env);
   if (request.method === "POST" && path === "/api/leituras") return postReading(request, env);
   if (request.method === "GET" && path === "/api/me") return me(request, env);
   if (request.method === "POST" && path === "/api/dispositivos/chave") return rotateDeviceKey(request, env);

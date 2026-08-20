@@ -19,7 +19,6 @@ async function api(path, options = {}) {
 function showDeviceCredentials(device) {
   const box = document.querySelector("#deviceCredentials");
   if (!box || !device?.api_key) return;
-  document.querySelector("#espCode").textContent = device.id;
   document.querySelector("#espKey").textContent = device.api_key;
   box.hidden = false;
   localStorage.removeItem(deviceKey);
@@ -39,17 +38,16 @@ function renderChart(current, canvasId, labels, values, color) {
 }
 function renderHistory(rows) {
   const tbody = document.querySelector("#historyBody"); tbody.innerHTML = "";
-  if (!rows.length) { tbody.innerHTML = '<tr><td class="empty" colspan="4">Ainda não há leituras enviadas pelo seu ESP.</td></tr>'; return; }
-  rows.forEach((row) => { const tr = document.createElement("tr"); [row.dia, row.device_id, `${Number(row.total_litros).toFixed(2)} L`, Number(row.total_litros) > 100 ? "Alto consumo" : "Normal"].forEach((value) => { const td = document.createElement("td"); td.textContent = value; tr.append(td); }); tbody.append(tr); });
+  if (!rows.length) { tbody.innerHTML = '<tr><td class="empty" colspan="3">Ainda não há leituras enviadas pelo seu ESP.</td></tr>'; return; }
+  rows.forEach((row) => { const tr = document.createElement("tr"); [row.dia, `${Number(row.total_litros).toFixed(2)} L`, Number(row.total_litros) > 100 ? "Alto consumo" : "Normal"].forEach((value) => { const td = document.createElement("td"); td.textContent = value; tr.append(td); }); tbody.append(tr); });
 }
 async function refreshDashboard() {
   showStatus("Atualizando dados…");
   try {
     const [profile, today, daily, weekly, history] = await Promise.all([api("/api/me"), api("/api/consumo/hoje"), api("/api/consumo/diario"), api("/api/consumo/semanal"), api("/api/historico")]);
     document.querySelector("#todayUsage").textContent = `${Number(today.total_litros).toFixed(2)} L`;
-    document.querySelector("#deviceName").textContent = profile.device.id;
+    document.querySelector("#deviceName").textContent = profile.device.name;
     document.querySelector("#userName").textContent = profile.user.name;
-    document.querySelector("#espCode").textContent = profile.device.id;
     const credentials = document.querySelector("#deviceCredentials");
     credentials.hidden = false;
     if (!document.querySelector("#espKey").textContent) document.querySelector("#espKey").textContent = "Gere uma nova chave apenas se precisar reconfigurar o ESP.";
@@ -59,10 +57,18 @@ async function refreshDashboard() {
 
 document.addEventListener("DOMContentLoaded", () => {
   installCopyButtons();
+  if (location.pathname.endsWith("/") || location.pathname.endsWith("index.html")) {
+    if (token()) api("/api/me").then(() => { location.href = "dashboard.html"; }).catch(() => {});
+    return;
+  }
   if (location.pathname.endsWith("auth.html")) {
     if (token()) { location.href = "dashboard.html"; return; }
     document.querySelector("#loginForm").addEventListener("submit", async (event) => { event.preventDefault(); showStatus("Entrando…"); try { const data = await api("/api/auth/login", { method: "POST", body: JSON.stringify({ email: document.querySelector("#loginEmail").value, password: document.querySelector("#loginPassword").value }) }); setToken(data.token); location.href = "dashboard.html"; } catch (error) { showStatus(error.message, "error"); } });
     document.querySelector("#registerForm").addEventListener("submit", async (event) => { event.preventDefault(); showStatus("Criando sua conta…"); try { const data = await api("/api/auth/register", { method: "POST", body: JSON.stringify({ name: document.querySelector("#registerName").value, email: document.querySelector("#registerEmail").value, password: document.querySelector("#registerPassword").value }) }); setToken(data.token); localStorage.setItem(deviceKey, JSON.stringify(data.device)); showDeviceCredentials(data.device); } catch (error) { showStatus(error.message, "error"); } });
+    document.querySelector("#forgotPasswordButton").addEventListener("click", () => { document.querySelector("#passwordRecovery").hidden = false; document.querySelector("#forgotEmail").focus(); });
+    document.querySelector("#forgotForm").addEventListener("submit", async (event) => { event.preventDefault(); const email = document.querySelector("#forgotEmail").value.trim(); showStatus("Enviando código…"); try { const data = await api("/api/auth/forgot-password", { method: "POST", body: JSON.stringify({ email }) }); document.querySelector("#resetEmail").value = email; document.querySelector("#resetForm").hidden = false; showStatus(data.message, "success"); } catch (error) { showStatus(error.message, "error"); } });
+    document.querySelector("#resetForm").addEventListener("submit", async (event) => { event.preventDefault(); showStatus("Atualizando senha…"); try { const data = await api("/api/auth/reset-password", { method: "POST", body: JSON.stringify({ email: document.querySelector("#resetEmail").value, code: document.querySelector("#resetCode").value, password: document.querySelector("#resetPassword").value }) }); showStatus(data.message, "success"); document.querySelector("#loginEmail").value = document.querySelector("#resetEmail").value; document.querySelector("#passwordRecovery").hidden = true; } catch (error) { showStatus(error.message, "error"); } });
+    document.querySelector("#backToLogin").addEventListener("click", () => { document.querySelector("#passwordRecovery").hidden = true; showStatus(""); });
     return;
   }
   if (!token()) { location.href = "auth.html"; return; }
