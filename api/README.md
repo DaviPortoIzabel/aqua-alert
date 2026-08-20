@@ -8,7 +8,9 @@ API serverless para Cloudflare Workers com banco Cloudflare D1. Ela é independe
 |---|---|---|---|
 | GET | `/health` | público | confirma se a API está online |
 | POST | `/api/leituras` | `X-Device-Key` | grava leitura do ESP8266 |
-| GET | `/api/consumo/hoje` | Bearer token | total do dia |
+| POST | `/api/auth/register` | público | cria conta e ESP exclusivo |
+| POST | `/api/auth/login` | público | inicia a sessão do usuário |
+| GET | `/api/consumo/hoje` | sessão do usuário | total do dia |
 | GET | `/api/consumo/diario` | Bearer token | gráfico hora a hora |
 | GET | `/api/consumo/semanal` | Bearer token | gráfico dos últimos 7 dias |
 | GET | `/api/historico` | Bearer token | totais diários |
@@ -37,9 +39,8 @@ npx wrangler login
 npx wrangler d1 create aqua-alert
 # Cole o database_id retornado em wrangler.toml
 npx wrangler d1 execute aqua-alert --remote --file=schema.sql
-npx wrangler secret put DEVICE_KEY
-npx wrangler secret put DASHBOARD_KEY
+npx wrangler secret put AUTH_SECRET
 npx wrangler deploy
 ```
 
-Use chaves longas e diferentes. `DEVICE_KEY` fica somente no dispositivo; `DASHBOARD_KEY` será substituída por login de usuário na etapa 3, portanto nunca deve ir para o GitHub Pages.
+`AUTH_SECRET` é uma chave longa usada para assinar as sessões e nunca deve ir para o GitHub. Cada conta recebe um código e uma chave próprios para o ESP no momento do cadastro.

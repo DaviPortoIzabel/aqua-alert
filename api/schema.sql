@@ -1,8 +1,18 @@
 PRAGMA foreign_keys = ON;
 
+CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS devices (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
+  owner_id INTEGER NOT NULL REFERENCES users(id),
+  device_key_hash TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -15,8 +25,5 @@ CREATE TABLE IF NOT EXISTS readings (
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_readings_device_time
-  ON readings(device_id, measured_at);
-
--- Dispositivo inicial. Troque o nome e o id se necessário antes do deploy.
-INSERT OR IGNORE INTO devices (id, name) VALUES ('aqua-001', 'Sensor Aqua Alert');
+CREATE INDEX IF NOT EXISTS idx_readings_device_time ON readings(device_id, measured_at);
+CREATE INDEX IF NOT EXISTS idx_devices_owner ON devices(owner_id);

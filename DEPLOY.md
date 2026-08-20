@@ -8,8 +8,7 @@ API já publicada em:
 
 Crie duas chaves diferentes com pelo menos 32 caracteres:
 
-- `DEVICE_KEY`: use somente no Arduino, no cabeçalho `X-Device-Key`.
-- `DASHBOARD_KEY`: informe manualmente na primeira abertura de `dashboard.html`.
+- `AUTH_SECRET`: usado pela API para assinar as sessões dos usuários.
 
 ## 2. Enviar os arquivos ao GitHub
 
@@ -27,6 +26,6 @@ No repositório `DaviPortoIzabel/aqua-alert`, abra **Settings → Pages** e esco
 - Branch: **main**
 - Folder: **/docs**
 
-Salve. O GitHub mostrará a URL pública do site. Abra `/dashboard.html`, informe a URL do Worker, `aqua-001` e a `DASHBOARD_KEY` para usar o painel.
+Salve. O GitHub mostrará a URL pública do site. Cada visitante deve criar a própria conta em `/auth.html`; o painel mostrará somente os dados vinculados ao ESP daquela conta.
 
-> Não coloque nenhuma chave em `docs/`, no repositório GitHub ou no JavaScript. O painel guarda a chave apenas no navegador que a digitou.
+> Não coloque nenhuma chave em `docs/`, no repositório GitHub ou no JavaScript. A chave individual do ESP é exibida só para o dono da conta quando ela é criada ou renovada.

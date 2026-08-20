@@ -7,6 +7,5 @@ binding = "DB"
 database_name = "aqua-alert"
 database_id = "2dab8707-3e52-446c-aaed-9ec1c2cb2f1f"
 
-# Segredos exigidos no deploy (não devem ser escritos neste arquivo):
-# wrangler secret put DEVICE_KEY
-# wrangler secret put DASHBOARD_KEY
+# Segredo exigido no deploy (não deve ser escrito neste arquivo):
+# wrangler secret put AUTH_SECRET
