@@ -1,0 +1,26 @@
+/* CSS específico para profile.html */
+
+/* Estilos básicos para profile.html */
+
+body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+}
+
+nav {
+    margin-bottom: 20px;
+}
+
+nav a {
+    margin-right: 10px;
+    text-decoration: none;
+    color: blue;
+}
+
+h1 {
+    color: #333;
+}
+
+section {
+    margin-top: 20px;
+}

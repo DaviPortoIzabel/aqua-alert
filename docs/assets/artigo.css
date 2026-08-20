@@ -1,0 +1,186 @@
+.artigos-header {
+  text-align: center;
+  margin-bottom: 2rem;
+  animation: fadeIn 0.8s ease-out forwards;
+}
+
+.artigos-header h1 {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+  color: var(--primary-color, #3498db);
+  font-weight: 700;
+}
+
+.artigos-header p {
+  font-size: 1.2rem;
+  opacity: 0.8;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.artigos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.artigo-card {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  animation: fadeIn 0.8s ease-out forwards;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.artigo-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+}
+
+.artigo-icon {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.artigo-card h2 {
+  font-size: 1.4rem;
+  margin-bottom: 1rem;
+  color: var(--primary-color, #3498db);
+  text-align: center;
+  font-weight: 600;
+}
+
+.artigo-content {
+  flex: 1;
+}
+
+/* Lista de artigos */
+.articles-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+}
+
+.articles-list li {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 14px 18px;
+  margin-bottom: 14px;
+  border-radius: 12px;
+  line-height: 1.6;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  transition: transform 0.15s ease, background 0.2s;
+}
+
+.articles-list li:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-3px);
+}
+
+.articles-list li span.icon {
+  font-size: 1.4rem;
+  flex-shrink: 0;
+}
+
+/* Mitos e verdades */
+.mito-verdade {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  transition: transform 0.2s ease;
+}
+
+.mito-verdade:hover {
+  transform: translateY(-3px);
+}
+
+.mito, .verdade {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 0.5rem;
+}
+
+.mito-icon, .verdade-icon {
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+.mito-icon {
+  color: #e74c3c;
+}
+
+.verdade-icon {
+  color: #2ecc71;
+}
+
+/* Estatísticas */
+.stat-highlight {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.stat {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--accent-color, #2ecc71);
+  margin-bottom: 0.5rem;
+}
+
+.artigo-text {
+  text-align: center;
+  margin-top: 1rem;
+  font-style: italic;
+}
+
+/* Economia */
+.economia-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+  margin-bottom: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1rem;
+  border-radius: 10px;
+}
+
+.economia-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.economia-tip {
+  background: rgba(46, 204, 113, 0.1);
+  border-left: 4px solid var(--accent-color, #2ecc71);
+  padding: 1rem;
+  margin-top: 1rem;
+  border-radius: 0 10px 10px 0;
+}
+
+/* Animações */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+  .artigos-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .artigos-header h1 {
+    font-size: 2rem;
+  }
+}

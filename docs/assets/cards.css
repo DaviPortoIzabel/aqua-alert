@@ -1,0 +1,66 @@
+/* --- GRID PRINCIPAL --- */
+.cards-grid {
+    display: grid; /* Usamos grid layout */
+    grid-template-columns: repeat(3, 1fr); /* 3 colunas de tamanho igual */
+    grid-template-rows: repeat(2, 1fr);    /* 2 linhas de tamanho igual */
+    gap: 30px; /* Espaço entre os cards */
+    margin-top: 40px; /* Espaço superior */
+    padding: 10px; /* Espaçamento interno da grid */    
+    
+    
+}
+
+/* --- ESTILO DOS CARDS --- */
+.card-link {
+    display: flex; /* Flex para alinhar conteúdo dentro */
+    flex-direction: column; /* Coloca ícone, título e texto em coluna */
+    align-items: center; /* Centraliza no eixo horizontal */
+    justify-content: center; /* Centraliza no eixo vertical */
+
+    /* Fundo branco com mais transparência */
+    background: rgba(213, 250, 234, 0.6);
+
+    border-radius: 16px; /* Bordas arredondadas */
+    box-shadow: 0 6px 14px rgba(0,0,0,0.12); /* Sombra leve */
+
+    text-decoration: none; /* Remove sublinhado dos links */
+    color: inherit; /* Mantém a cor padrão do texto */
+
+    transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s ease; 
+
+    aspect-ratio: 1 / 1;  /* Mantém cada card quadrado */
+    width: 100%; /* Ocupa toda a largura da célula */
+}
+
+/* --- HOVER NOS CARDS --- */
+.card-link:hover {
+    transform: translateY(-8px); /* Dá efeito de levantar */
+    box-shadow: 0 10px 20px rgba(0,0,0,0.18); /* Sombra mais forte */
+    background: rgba(190, 252, 236, 0.75); /* Fundo menos transparente no hover */
+}
+
+/* --- TÍTULO DOS CARDS --- */
+.card-link h3 {
+    margin: 10px 0 6px; /* Espaçamento externo */
+    font-size: 24px; /* 🔑 Fonte maior */
+    font-weight: bold; /* Negrito */
+    color: var(--text-color, #222); /* Cor herdada */
+    text-align: center; /* Centralizado */
+}
+
+/* --- TEXTO DOS CARDS --- */
+.card-link p {
+    font-size: 18px; /* 🔑 Fonte maior */
+    color: #000000; /* Cor mais visível */
+    text-align: center; /* Centralizado */
+    line-height: 1.5; /* Melhor legibilidade */
+    max-width: 220px; /* Limita largura do texto */
+}
+
+/* --- ÍCONES/EMOJIS --- */
+.card-link h3::before {
+    content: attr(data-icon); /* Pega ícone passado no atributo data-icon */
+    display: block; /* Mostra em bloco (linha própria) */
+    font-size: 48px; /* 🔑 Ícone maior */
+    margin-bottom: 10px; /* Espaço abaixo do ícone */
+}

@@ -1,0 +1,112 @@
+/* CSS específico para history.html */
+
+/* ================= SECTION ================= */
+
+.section {
+    grid-column: 1 / -1;
+    display: grid;
+    gap: 16px;
+}
+
+/* ================= CARD ================= */
+
+.card {
+    background: var(--panel);
+    border-radius: var(--radius);
+    border: var(--border);
+    box-shadow: var(--shadow);
+    padding: 16px;
+}
+
+/* ================= CARD HEADER ================= */
+
+.card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.card-title {
+    font-weight: 700;
+}
+
+.card-sub {
+    color: var(--muted);
+    font-size: .9rem;
+}
+
+/* ================= MB-8 ================= */
+
+.mb-8 {
+    margin-bottom: 8px;
+}
+
+/* ================= INPUT ================= */
+
+.input {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: var(--panel-2);
+    border: var(--border);
+    color: var(--text);
+}
+
+.input:focus {
+    outline: none;
+    box-shadow: var(--focus);
+}
+
+/* ================= TABLE ================= */
+
+.table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 10px;
+}
+
+.table thead th {
+    text-align: left;
+    font-size: .9rem;
+    color: var(--muted);
+    font-weight: 600;
+    padding: 8px 12px;
+    cursor: pointer;
+}
+
+.table tbody tr {
+    background: var(--panel);
+    border: var(--border);
+}
+
+.table tbody tr td {
+    padding: 12px;
+    border-top: var(--border);
+    border-bottom: var(--border);
+}
+
+.table tbody tr td:first-child {
+    border-left: var(--border);
+    border-top-left-radius: 12px;
+    border-bottom-left-radius: 12px;
+}
+
+.table tbody tr td:last-child {
+    border-right: var(--border);
+    border-top-right-radius: 12px;
+    border-bottom-right-radius: 12px;
+}
+
+/* ================= MT-16 ================= */
+
+.mt-16 {
+    margin-top: 16px;
+}
+
+/* ================= FLEX ================= */
+
+.flex {
+    display: flex;
+    gap: 10px;
+}

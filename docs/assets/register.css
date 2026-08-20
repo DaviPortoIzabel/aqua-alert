@@ -1,0 +1,108 @@
+:root {
+  --bg: #0b1220;
+  --panel: #111a2b;
+  --panel-2: #0e1728;
+  --text: #e9f2ff;
+  --border: 1px solid rgba(255, 255, 255, .08);
+  --shadow: 0 10px 30px rgba(0, 0, 0, .25);
+  --brand: #2dd4bf;
+  --brand-2: #22c1a9;
+  --error: #ef4444;
+}
+
+body {
+  background: linear-gradient(180deg, var(--bg), #0e2435);
+  font-family: "Segoe UI", Roboto, Inter, sans-serif;
+  margin: 0;
+  padding: 0;
+  color: var(--text);
+}
+
+.register-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+}
+
+.register-box {
+  background: var(--panel);
+  padding: 32px 28px;
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  width: 100%;
+  max-width: 360px;
+  text-align: center;
+}
+
+.register-box h1 {
+  margin-bottom: 24px;
+  color: var(--brand);
+  font-size: 2rem;
+  letter-spacing: 1px;
+}
+
+.register-box form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.register-box input {
+  padding: 12px;
+  border: var(--border);
+  border-radius: 12px;
+  font-size: 1rem;
+  outline: none;
+  transition: border 0.2s, background 0.2s;
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+.register-box input:focus {
+  border: 1.5px solid var(--brand);
+  background: rgba(45, 212, 191, 0.08);
+}
+
+.register-box button {
+  background: linear-gradient(180deg, var(--brand), var(--brand-2));
+  color: #07221e;
+  border: none;
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 1rem;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: transform 0.2s, background 0.2s;
+  font-weight: bold;
+  letter-spacing: 1px;
+}
+
+.register-box button:hover {
+  transform: translateY(-2px);
+}
+
+.register-box .extra-options, 
+.register-box .link {
+  margin-top: 16px;
+  font-size: 0.95rem;
+}
+
+.register-box .extra-options a,
+.register-box .link a {
+  color: var(--brand);
+  text-decoration: none;
+  margin: 0 8px;
+  transition: color 0.2s;
+}
+
+.register-box .extra-options a:hover,
+.register-box .link a:hover {
+  color: var(--brand-2);
+}
+
+.error {
+  color: var(--error);
+  margin-top: 10px;
+  font-size: 0.95rem;
+}

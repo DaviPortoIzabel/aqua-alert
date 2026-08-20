@@ -1,0 +1,155 @@
+/* CSS específico para artigosuser.html */
+
+/* ================= SECTION ================= */
+
+.section {
+    grid-column: 1 / -1;
+    display: grid;
+    gap: 16px;
+}
+
+/* ================= CARD ================= */
+
+.card {
+    background: var(--panel);
+    border-radius: var(--radius);
+    border: var(--border);
+    box-shadow: var(--shadow);
+    padding: 16px;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+/* ================= CARD HEADER ================= */
+
+.card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.card-title {
+    font-weight: 700;
+}
+
+.card-sub {
+    color: var(--muted);
+    font-size: .9rem;
+}
+
+/* ================= CARD BODY ================= */
+
+.card-body {
+    padding: 10px 0;
+}
+
+/* ================= MT-24 ================= */
+
+.mt-24 {
+    margin-top: 24px;
+}
+
+/* ================= ESTILOS INLINE CONVERTIDOS ================= */
+
+#view-artigos .card {
+    background-color: rgba(255, 255, 255, 0.164);
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    padding: 2rem;
+    max-width: 900px;
+    margin: 2rem auto;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: #fdfdfd;
+}
+
+/* Header do card */
+#view-artigos .card-header {
+    margin-bottom: 1.5rem;
+}
+
+#view-artigos .card-title {
+    font-size: 1.8rem;
+    font-weight: 700;
+    margin-bottom: 0.3rem;
+    color: #003a97;
+}
+
+#view-artigos .card-sub {
+    font-size: 1rem;
+    font-weight: 400;
+    color: #ffffff;
+}
+
+/* Corpo do card */
+#view-artigos .card-body section {
+    margin-bottom: 2rem;
+}
+
+/* Títulos das seções */
+#view-artigos h2 {
+    font-size: 1.5rem;
+    margin-bottom: 0.8rem;
+    color: #0ca8fc;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Listas não ordenadas */
+#view-artigos ul {
+    padding-left: 1.5rem;
+    list-style-type: disc;
+    margin-top: 0.5rem;
+}
+
+#view-artigos li {
+    margin-bottom: 0.6rem;
+    line-height: 1.6;
+    font-size: 1rem;
+}
+
+/* Listas de definições (dl, dt, dd) */
+#view-artigos dl {
+    margin-top: 0.5rem;
+}
+
+#view-artigos dt {
+    font-weight: 700;
+    margin-top: 1rem;
+    color: #ff9900;
+}
+
+#view-artigos dd {
+    margin-left: 1.5rem;
+    margin-bottom: 0.5rem;
+    color: #ffffff;
+    font-size: 1rem;
+}
+
+/* Parágrafos */
+#view-artigos p {
+    line-height: 1.8;
+    font-size: 1rem;
+    margin-top: 0.5rem;
+}
+
+/* Espaçamento entre seções */
+#view-artigos .mt-24 {
+    margin-top: 2rem;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    #view-artigos .card {
+        padding: 1.5rem;
+    }
+
+    #view-artigos h2 {
+        font-size: 1.3rem;
+    }
+
+    #view-artigos li, #view-artigos dd, #view-artigos p {
+        font-size: 0.95rem;
+    }
+}

@@ -1,0 +1,318 @@
+/* CSS específico para usuario.html */
+
+/* ================= APP ================= */
+
+.app {
+    min-height: 100dvh;
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    grid-template-rows: 64px 1fr;
+    grid-template-areas:
+        "sidebar header"
+        "sidebar main";
+}
+
+/* ================= HEADER ================= */
+
+.header {
+    grid-area: header;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px;
+    background: var(--header-bg-gradient);
+    border-bottom: var(--header-border-color);
+    backdrop-filter: blur(10px);
+    animation: slideDown 0.5s ease;
+}
+
+@keyframes slideDown {
+    from {
+        transform: translateY(-20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.header .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    letter-spacing: .2px;
+    transition: all 0.3s ease;
+}
+
+.header .brand:hover {
+    transform: scale(1.05);
+}
+
+.brand .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background: var(--brand);
+    box-shadow: 0 0 18px var(--brand);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(45, 212, 191, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 6px rgba(45, 212, 191, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(45, 212, 191, 0);
+    }
+}
+
+.header .actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* ================= SIDEBAR ================= */
+
+.sidebar {
+    grid-area: sidebar;
+    position: sticky;
+    top: 0;
+    padding: 24px 16px;
+    border-right: var(--border);
+    background: var(--panel-2);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: all 0.3s ease;
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
+}
+
+.nav-group {
+    margin-top: 4px;
+    animation: fadeIn 0.5s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.nav-title {
+    font-size: .78rem;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    color: var(--muted);
+    margin: 12px 8px;
+    position: relative;
+    font-weight: 600;
+}
+
+.nav-title::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: -4px;
+    width: 30px;
+    height: 2px;
+    background: var(--brand);
+    border-radius: 2px;
+}
+
+/* ================= MAIN ================= */
+
+.main {
+    grid-area: main;
+    padding: 20px;
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(12, 1fr);
+}
+
+/* ================= CARDS GRID ================= */
+
+.cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 16px;
+    grid-column: 1 / -1;
+}
+
+/* ================= CARD LINK ================= */
+
+.card-link {
+    background: var(--panel);
+    border-radius: var(--radius);
+    border: var(--border);
+    box-shadow: var(--shadow);
+    padding: 20px;
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    display: block;
+}
+
+.card-link:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+}
+
+.card-link h3 {
+    font-weight: 700;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.card-link h3::before {
+    content: attr(data-icon);
+    font-size: 1.5rem;
+}
+
+.card-link p {
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+
+/* ================= SECTION ================= */
+
+.section {
+    grid-column: 1 / -1;
+    display: grid;
+    gap: 16px;
+}
+
+main.main {
+    overflow-y: auto;
+    max-height: calc(100vh - 60px);
+}
+
+/* ================= CARD ================= */
+
+.card {
+    background: var(--panel);
+    border-radius: var(--radius);
+    border: var(--border);
+    box-shadow: var(--shadow);
+    padding: 16px;
+}
+
+/* ================= CARD HEADER ================= */
+
+.card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.card-title {
+    font-weight: 700;
+}
+
+.card-sub {
+    color: var(--muted);
+    font-size: .9rem;
+}
+
+/* ================= FLEX ================= */
+
+.flex {
+    display: flex;
+    gap: 10px;
+}
+
+/* ================= BTN ================= */
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    border: var(--border);
+    background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .02));
+    transition: transform .06s ease, background .2s ease, box-shadow .2s ease;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+}
+
+.btn:focus-visible {
+    outline: none;
+    box-shadow: var(--focus);
+}
+
+.btn.primary {
+    background: linear-gradient(180deg, var(--brand), var(--brand-2));
+    color: #07221e;
+    border-color: transparent;
+}
+
+/* ================= GRID-2 ================= */
+
+.grid-2 {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(2, 1fr);
+}
+
+/* ================= HIDDEN ================= */
+
+.hidden {
+    display: none !important;
+}
+
+/* ================= BG-WAVES ================= */
+
+.bg-waves {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: -1;
+    background: radial-gradient(1200px 600px at 70% -10%, var(--bg-wave-primary), transparent 60%),
+                radial-gradient(800px 400px at 10% 20%, var(--bg-wave-secondary), transparent 60%),
+                radial-gradient(600px 300px at 90% 80%, var(--bg-wave-tertiary), transparent 60%),
+                var(--bg-wave-base);
+    overflow: hidden;
+}
+
+.bg-waves::before,
+.bg-waves::after {
+    content: "";
+    position: absolute;
+    left: -20%;
+    right: -20%;
+    height: 45%;
+    background: radial-gradient(120% 80% at 50% 100%, var(--bg-wave-before), transparent 60%);
+    opacity: .45;
+    filter: blur(18px);
+    animation: drift 14s infinite ease-in-out alternate;
+    transform: translateY(-30px) skewY(-4deg);
+}
+
+.bg-waves::after {
+    top: auto;
+    bottom: -10%;
+    background: radial-gradient(110% 90% at 50% 0%, var(--bg-wave-after), transparent 60%);
+    animation-duration: 18s;
+    animation-delay: -3s;
+}
+
+@keyframes drift {
+    0% {
+        transform: translateY(-30px) skewY(-4deg);
+    }
+    100% {
+        transform: translateY(10px) skewY(4deg);
+    }
+}

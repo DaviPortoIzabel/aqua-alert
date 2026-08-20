@@ -1,0 +1,12 @@
+# Cache e credenciais locais da Cloudflare/Wrangler
+api/.wrangler/
+api/.dev.vars
+api/.env
+
+# Arquivos comuns do ambiente Python
+__pycache__/
+*.py[cod]
+
+# Arquivos do sistema
+.DS_Store
+Thumbs.db

@@ -1,0 +1,125 @@
+/* CSS específico para dashboard.html */
+
+/* ================= SECTION ================= */
+
+.section {
+    grid-column: 1 / -1;
+    display: grid;
+    gap: 16px;
+}
+
+/* ================= GRID-2 ================= */
+
+.grid-2 {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(2, 1fr);
+}
+
+/* ================= TOP-CARDS ================= */
+
+.top-cards {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(2, 1fr);
+}
+
+/* ================= CARD ================= */
+
+.card {
+    background: var(--panel);
+    border-radius: var(--radius);
+    border: var(--border);
+    box-shadow: var(--shadow);
+    padding: 16px;
+    margin-bottom: 20px;
+    max-width: 100%;
+    margin-left: 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    border-radius: 10px;
+}
+
+/* ================= STAT ================= */
+
+.stat {
+    display: grid;
+    gap: 6px;
+    min-height: 180px;
+    align-content: center;
+}
+
+.stat .value {
+    font-size: 2rem;
+    font-weight: 800;
+}
+
+.stat.ok .value {
+    color: var(--ok);
+}
+
+.stat.warn .value {
+    color: var(--warn);
+}
+
+.stat.crit .value {
+    color: var(--crit);
+}
+
+/* ================= CARD HEADER ================= */
+
+.card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.card-title {
+    font-weight: 700;
+}
+
+.card-sub {
+    color: var(--muted);
+    font-size: .9rem;
+}
+
+/* ================= DASHBOARD HEADER ================= */
+
+.dashboard-header {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.dashboard-header p {
+    color: var(--muted);
+}
+
+/* ================= CHART CONTAINER ================= */
+
+.chart-container {
+    position: relative;
+    height: 220px;
+    width: 100%;
+    max-width: 480px;
+    margin: 0 auto;
+}
+
+.chart-container canvas {
+    width: 100% !important;
+    height: 100% !important;
+    display: auto;
+}
+
+/* ================= CARD ICON ================= */
+
+.card-icon {
+    font-size: 2rem;
+    margin-bottom: 10px;
+}
+
+/* ================= VIEW DASHBOARD ================= */
+
+#view-dashboard {
+    overflow-y: auto;
+    max-height: calc(100vh - 60px);
+}

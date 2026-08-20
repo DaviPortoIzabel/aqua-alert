@@ -1,0 +1,75 @@
+/* CSS específico para index.html */
+
+/* ================= WELCOME BOX ================= */
+
+.welcome-box {
+  max-width: 800px;
+  background: white;
+  padding: 55px;
+  border-radius: 18px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.06);
+  text-align: center;
+}
+
+.welcome-box h1 {
+  font-family: var(--font-heading);
+  font-size: 2.5rem;
+  margin-bottom: 20px;
+  color: var(--primary);
+}
+
+.welcome-box p {
+  margin-bottom: 15px;
+  font-size: 1.05rem;
+}
+
+/* ================= BOTÕES ================= */
+
+.cta-primary {
+  display: inline-block;
+  padding: 14px 32px;
+  background: var(--secondary);
+  color: white;
+  text-decoration: none;
+  border-radius: 40px;
+  font-weight: 600;
+  transition: 0.3s ease;
+}
+
+.cta-primary:hover {
+  background: var(--primary);
+  transform: translateY(-3px);
+}
+
+.cta-secondary {
+  display: inline-block;
+  padding: 14px 32px;
+  background: transparent;
+  color: var(--primary);
+  text-decoration: none;
+  border-radius: 40px;
+  font-weight: 600;
+  border: 2px solid var(--primary);
+  transition: 0.3s ease;
+}
+
+.cta-secondary:hover {
+  background: var(--primary);
+  color: white;
+  transform: translateY(-3px);
+}
+
+/* ================= CTA BUTTONS ================= */
+
+.cta-buttons {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  margin-top: 30px;
+}
+
+/* ================= WAVE (se usado) ================= */
+
+.wave {
+  /* Adicionar estilo se necessário */
+}

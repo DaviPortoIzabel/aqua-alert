@@ -1,0 +1,68 @@
+/* CSS específico para config.html */
+
+/* ================= SECTION ================= */
+
+.section {
+    grid-column: 1 / -1;
+    display: grid;
+    gap: 16px;
+}
+
+/* ================= CARD ================= */
+
+.card {
+    background: var(--panel);
+    border-radius: var(--radius);
+    border: var(--border);
+    box-shadow: var(--shadow);
+    padding: 16px;
+}
+
+/* ================= CARD HEADER ================= */
+
+.card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.card-title {
+    font-weight: 700;
+}
+
+/* ================= GRID-2 ================= */
+
+.grid-2 {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(2, 1fr);
+}
+
+/* ================= MB-8 ================= */
+
+.mb-8 {
+    margin-bottom: 8px;
+}
+
+/* ================= MT-8 ================= */
+
+.mt-8 {
+    margin-top: 8px;
+}
+
+/* ================= SELECT ================= */
+
+.select {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: var(--panel-2);
+    border: var(--border);
+    color: var(--text);
+}
+
+.select:focus {
+    outline: none;
+    box-shadow: var(--focus);
+}
