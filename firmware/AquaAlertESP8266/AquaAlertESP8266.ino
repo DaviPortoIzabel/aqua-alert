@@ -116,16 +116,17 @@ bool connectToSavedWiFi() {
 
 String configurationPage(const String &message = "") {
   String html = R"rawliteral(
-<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Configurar Aqua Alert</title><style>body{font-family:Arial,sans-serif;background:#eef5f7;margin:0;padding:20px}.box{max-width:420px;margin:30px auto;background:#fff;padding:24px;border-radius:14px;box-shadow:0 6px 20px #0002}h1{font-size:22px}label{display:block;margin-top:14px;font-weight:bold}input,button{box-sizing:border-box;width:100%;padding:12px;margin-top:6px;border-radius:8px;font-size:16px}input{border:1px solid #b8c6cb}button{border:0;background:#087f8c;color:#fff;font-weight:bold}.message{padding:10px;border-radius:8px;background:#e2f3f5;color:#075b63}.danger{display:block;margin-top:18px;color:#a52222;text-align:center}</style></head><body><main class="box"><h1>Configurar Aqua Alert</h1><p>Use a chave de cinco digitos mostrada pelo site ao criar sua conta.</p>
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Cache-Control" content="no-store"><title>Configurar Aqua Alert</title><style>body{font-family:Arial,sans-serif;background:#eef5f7;margin:0;padding:20px}.box{max-width:420px;margin:30px auto;background:#fff;padding:24px;border-radius:14px;box-shadow:0 6px 20px #0002}h1{font-size:22px}label{display:block;margin-top:14px;font-weight:bold}input,button{box-sizing:border-box;width:100%;padding:12px;margin-top:6px;border-radius:8px;font-size:16px}input{border:1px solid #b8c6cb}button{border:0;background:#087f8c;color:#fff;font-weight:bold}.message{padding:10px;border-radius:8px;background:#e2f3f5;color:#075b63}.danger{display:block;margin-top:18px;color:#a52222;text-align:center}</style></head><body><main class="box"><h1>Configurar Aqua Alert</h1><p>Informe os dados da sua rede e a chave/ID de cinco digitos mostrada pelo site.</p>
 )rawliteral";
   if (message.length()) html += "<p class=\"message\">" + message + "</p>";
   html += R"rawliteral(
-<form action="/save" method="post"><label>Nome da rede Wi-Fi (SSID)<input name="ssid" maxlength="31" required></label><label>Senha da rede Wi-Fi<input type="password" name="password" maxlength="63"></label><label>Chave do ESP<input name="device_key" inputmode="numeric" pattern="[0-9]{5}" minlength="5" maxlength="5" required></label><button type="submit">Salvar e conectar</button></form><a class="danger" href="/reset">Apagar configuracao salva</a></main></body></html>
+<form action="/save" method="post"><label>Nome da rede Wi-Fi (SSID)<input name="ssid" maxlength="31" required></label><label>Senha da rede Wi-Fi<input type="password" name="password" maxlength="63"></label><label>Chave/ID do ESP (5 digitos)<input name="device_key" inputmode="numeric" pattern="[0-9]{5}" minlength="5" maxlength="5" required></label><button type="submit">Salvar e conectar</button></form><a class="danger" href="/reset">Apagar configuracao salva</a></main></body></html>
 )rawliteral";
   return html;
 }
 
 void handleRoot() {
+  server.sendHeader("Cache-Control", "no-store, no-cache, must-revalidate");
   server.send(200, "text/html; charset=utf-8", configurationPage());
 }
 
@@ -155,7 +156,9 @@ void startConfigurationPortal() {
   portalRunning = true;
   WiFi.disconnect();
   delay(200);
-  WiFi.mode(WIFI_AP);
+  // AP_STA preserva a capacidade de procurar a rede configurada apos reiniciar
+  // e mantem o ponto de acesso ativo para o portal cativo.
+  WiFi.mode(WIFI_AP_STA);
   WiFi.softAP(PORTAL_SSID, PORTAL_PASSWORD);
   const IPAddress portalIP = WiFi.softAPIP();
   dnsServer.start(DNS_PORT, "*", portalIP);
@@ -163,8 +166,14 @@ void startConfigurationPortal() {
   server.on("/save", HTTP_POST, handleSave);
   server.on("/reset", handleReset);
   server.on("/generate_204", handleRoot);       // Android
-  server.on("/fwlink", handleRoot);             // Windows
+  server.on("/gen_204", handleRoot);            // Android/Chrome
+  server.on("/fwlink", handleRoot);             // Windows legado
+  server.on("/connecttest.txt", handleRoot);    // Windows 10/11
+  server.on("/ncsi.txt", handleRoot);           // Windows NCSI
+  server.on("/redirect", handleRoot);           // ChromeOS
+  server.on("/canonical.html", handleRoot);     // Firefox
   server.on("/hotspot-detect.html", handleRoot); // Apple
+  server.on("/library/test/success.html", handleRoot); // Apple
   server.onNotFound(handleRoot);
   server.begin();
   Serial.println("Portal de configuracao iniciado.");
