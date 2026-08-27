@@ -16,7 +16,7 @@ const char *PORTAL_SSID = "AquaAlert_Config";
 const char *PORTAL_PASSWORD = "12345678";
 
 const byte SENSOR_PIN = D2;
-const unsigned long MEASUREMENT_INTERVAL_MS = 5000;
+const unsigned long MEASUREMENT_INTERVAL_MS = 60000; // Envia uma leitura por minuto.
 const unsigned long WIFI_RETRY_INTERVAL_MS = 30000;
 const float PULSES_PER_LITER = 450.0f; // Calibre este valor caso o sensor usado seja diferente.
 
@@ -196,7 +196,7 @@ void sendReading(float liters, float flowLpm) {
   }
   http.addHeader("Content-Type", "application/json");
   http.addHeader("X-Device-Key", savedDeviceKey);
-  const String payload = "{\"litros\":" + String(liters, 4) + ",\"fluxo\":" + String(flowLpm, 2) + ",\"intervalo_segundos\":5}";
+  const String payload = "{\"litros\":" + String(liters, 4) + ",\"fluxo\":" + String(flowLpm, 2) + ",\"intervalo_segundos\":" + String(MEASUREMENT_INTERVAL_MS / 1000) + "}";
   const int responseCode = http.POST(payload);
   Serial.printf("Envio para API: HTTP %d | %s\n", responseCode, payload.c_str());
   http.end();
