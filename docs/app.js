@@ -41,17 +41,25 @@ function renderHistory(rows) {
   if (!rows.length) { tbody.innerHTML = '<tr><td class="empty" colspan="3">Ainda não há leituras enviadas pelo seu ESP.</td></tr>'; return; }
   rows.forEach((row) => { const tr = document.createElement("tr"); [row.dia, `${Number(row.total_litros).toFixed(2)} L`, Number(row.total_litros) > 100 ? "Alto consumo" : "Normal"].forEach((value) => { const td = document.createElement("td"); td.textContent = value; tr.append(td); }); tbody.append(tr); });
 }
+function renderLeakAlert(alert) {
+  const box = document.querySelector("#leakAlert"); if (!box) return;
+  box.className = `leak-alert ${alert.level}`;
+  const labels = { normal: "Consumo semanal estável", media: "Possibilidade média de vazamento", alta: "Possibilidade alta de vazamento" };
+  document.querySelector("#leakTitle").textContent = labels[alert.level] || labels.normal;
+  if (alert.level === "normal") document.querySelector("#leakDescription").textContent = `Esta semana: ${alert.current_total.toFixed(2)} L. Semana anterior: ${alert.previous_total.toFixed(2)} L.`;
+  else document.querySelector("#leakDescription").textContent = `O consumo desta semana está ${alert.increase_percent.toFixed(1)}% maior que o da semana anterior (${alert.current_total.toFixed(2)} L contra ${alert.previous_total.toFixed(2)} L). Verifique possíveis vazamentos.`;
+}
 async function refreshDashboard() {
   showStatus("Atualizando dados…");
   try {
-    const [profile, today, daily, weekly, history] = await Promise.all([api("/api/me"), api("/api/consumo/hoje"), api("/api/consumo/diario"), api("/api/consumo/semanal"), api("/api/historico")]);
+    const [profile, today, daily, weekly, history, alert] = await Promise.all([api("/api/me"), api("/api/consumo/hoje"), api("/api/consumo/diario"), api("/api/consumo/semanal"), api("/api/historico"), api("/api/alertas/vazamento")]);
     document.querySelector("#todayUsage").textContent = `${Number(today.total_litros).toFixed(2)} L`;
     document.querySelector("#deviceName").textContent = profile.device.name;
     document.querySelector("#userName").textContent = profile.user.name;
     const credentials = document.querySelector("#deviceCredentials");
     credentials.hidden = false;
     if (!document.querySelector("#espKey").textContent) document.querySelector("#espKey").textContent = "Gere uma nova chave apenas se precisar reconfigurar o ESP.";
-    dailyChart = renderChart(dailyChart, "#dailyChart", daily.labels, daily.valores, "rgba(56,189,248,.72)"); weeklyChart = renderChart(weeklyChart, "#weeklyChart", weekly.labels, weekly.valores, "rgba(27,108,168,.72)"); renderHistory(history); showStatus("Dados atualizados.", "success");
+    dailyChart = renderChart(dailyChart, "#dailyChart", daily.labels, daily.valores, "rgba(56,189,248,.72)"); weeklyChart = renderChart(weeklyChart, "#weeklyChart", weekly.labels, weekly.valores, "rgba(27,108,168,.72)"); renderHistory(history); renderLeakAlert(alert); showStatus("Dados atualizados.", "success");
   } catch (error) { showStatus(error.message, "error"); }
 }
 

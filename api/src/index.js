@@ -64,9 +64,17 @@ async function requireDevice(request, env) {
 
 function newDeviceId() { return `ESP-${randomText(6).toUpperCase().replaceAll("_", "X").replaceAll("-", "Y")}`; }
 
+async function newDeviceKey(env) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const key = String(10000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 90000));
+    if (!await env.DB.prepare("SELECT id FROM devices WHERE device_key_hash = ?").bind(await sha256(key)).first()) return key;
+  }
+  throw new Error("Não foi possível gerar uma chave única.");
+}
+
 async function createDevice(ownerId, env) {
   const id = newDeviceId();
-  const key = randomText(32);
+  const key = await newDeviceKey(env);
   await env.DB.prepare("INSERT INTO devices (id, name, owner_id, device_key_hash) VALUES (?, ?, ?, ?)").bind(id, "Meu ESP", ownerId, await sha256(key)).run();
   return { name: "Meu ESP", api_key: key };
 }
@@ -146,7 +154,7 @@ async function me(request, env) {
 
 async function rotateDeviceKey(request, env) {
   const result = await requireDevice(request, env); if (result.response) return result.response;
-  const key = randomText(32);
+  const key = await newDeviceKey(env);
   await env.DB.prepare("UPDATE devices SET device_key_hash = ? WHERE id = ? AND owner_id = ?").bind(await sha256(key), result.device.id, result.user.id).run();
   return json({ device: { ...result.device, api_key: key } });
 }
@@ -189,6 +197,18 @@ async function dashboardWeekly(request, env) {
   return json({ labels: rows.results.map((row) => `${row.dia.slice(8, 10)}/${row.dia.slice(5, 7)}`), valores: rows.results.map((row) => Number(row.total)) });
 }
 
+async function leakAlert(request, env) {
+  const result = await requireDevice(request, env); if (result.response) return result.response;
+  const today = dateKey(new Date()); const currentStart = new Date(); currentStart.setDate(currentStart.getDate() - 6);
+  const previousStart = new Date(); previousStart.setDate(previousStart.getDate() - 13);
+  const previousEnd = new Date(); previousEnd.setDate(previousEnd.getDate() - 7);
+  const totals = await env.DB.prepare("SELECT COALESCE(SUM(CASE WHEN substr(measured_at, 1, 10) BETWEEN ? AND ? THEN liters ELSE 0 END), 0) AS current_total, COALESCE(SUM(CASE WHEN substr(measured_at, 1, 10) BETWEEN ? AND ? THEN liters ELSE 0 END), 0) AS previous_total FROM readings WHERE device_id = ?").bind(dateKey(currentStart), today, dateKey(previousStart), dateKey(previousEnd), result.device.id).first();
+  const currentTotal = Number(totals.current_total); const previousTotal = Number(totals.previous_total);
+  const increasePercent = previousTotal > 0 ? ((currentTotal - previousTotal) / previousTotal) * 100 : 0;
+  const level = increasePercent > 80 ? "alta" : increasePercent >= 40 ? "media" : "normal";
+  return json({ level, increase_percent: Math.max(0, Number(increasePercent.toFixed(1))), current_total: Number(currentTotal.toFixed(2)), previous_total: Number(previousTotal.toFixed(2)) });
+}
+
 async function history(request, env) {
   const result = await requireDevice(request, env); if (result.response) return result.response;
   const rows = await env.DB.prepare("SELECT substr(measured_at, 1, 10) AS dia, ROUND(SUM(liters), 3) AS total_litros, MAX(measured_at) AS ultima_atualizacao FROM readings WHERE device_id = ? GROUP BY dia ORDER BY dia DESC LIMIT 90").bind(result.device.id).all();
@@ -209,6 +229,7 @@ export default { async fetch(request, env) {
   if (request.method === "GET" && path === "/api/consumo/hoje") return dashboardToday(request, env);
   if (request.method === "GET" && path === "/api/consumo/diario") return dashboardDaily(request, env);
   if (request.method === "GET" && path === "/api/consumo/semanal") return dashboardWeekly(request, env);
+  if (request.method === "GET" && path === "/api/alertas/vazamento") return leakAlert(request, env);
   if (request.method === "GET" && path === "/api/historico") return history(request, env);
   return json({ error: "Rota não encontrada." }, 404);
 } };
