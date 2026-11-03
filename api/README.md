@@ -49,3 +49,41 @@ npx wrangler deploy
 ```
 
 `AUTH_SECRET` é uma chave longa usada para assinar as sessões e nunca deve ir para o GitHub. `BREVO_API_KEY`, `BREVO_SENDER_EMAIL` e `BREVO_SENDER_NAME` ficam nos segredos da Cloudflare para o envio de e-mails. Cada conta recebe somente uma chave própria para o ESP no momento do cadastro; o firmware envia essa chave no cabeçalho `X-Device-Key`.
+
+## Conta, foto e aparência
+
+O menu da conta usa `GET /api/me`, `POST /api/account` e
+`POST /api/account/password`. Foto e tema ficam no D1, vinculados ao usuário
+identificado pela sessão. A foto é recortada ao centro e convertida pelo navegador
+para JPEG de 192 × 192; a API aceita até 100 KB. Envie `avatar: null` para remover.
+Os temas são `system`, `light` e `dark`.
+
+A troca de senha exige `current_password` e `new_password` (8–128 caracteres).
+Ela devolve um novo token e invalida os anteriores, inclusive os de outros
+navegadores. Uma senha atual incorreta devolve 403 sem encerrar a sessão válida.
+A recuperação por e-mail também invalida as sessões anteriores.
+
+### Atualização de uma instalação existente
+
+Na pasta `api`, com autenticação Cloudflare disponível, **aplique esta migration
+antes de publicar o Worker**:
+
+```sh
+wrangler d1 execute aqua-alert --remote --file=migrations/0003_user_settings.sql
+wrangler deploy
+```
+
+A migration é aditiva e idempotente; não altera usuários, senhas ou leituras
+existentes. Não reaplique `0001_accounts.sql` sobre o schema atual. Em banco novo,
+`schema.sql` já inclui a tabela de preferências.
+
+Para desenvolvimento, substitua `--remote` por `--local`, inicie `wrangler dev
+--local` e execute na raiz do repositório:
+
+```sh
+node --test api/tests/account.test.mjs
+```
+
+Os testes criam contas descartáveis apenas na API local (porta 8787 por padrão).
+Cobrem persistência após novo login, isolamento entre usuários, remoção e validação
+da foto, preferências concorrentes e revogação de sessões na troca de senha.

@@ -38,3 +38,10 @@ CREATE TABLE IF NOT EXISTS password_reset_codes (
 );
 
 CREATE INDEX IF NOT EXISTS idx_password_reset_codes_user ON password_reset_codes(user_id, expires_at);
+
+CREATE TABLE IF NOT EXISTS user_settings (
+  user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  avatar TEXT,
+  theme TEXT NOT NULL DEFAULT 'system' CHECK (theme IN ('system', 'light', 'dark')),
+  auth_version INTEGER NOT NULL DEFAULT 0
+);

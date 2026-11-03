@@ -3,6 +3,7 @@ const headers = {
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Authorization, Content-Type, X-Device-Key",
   "Content-Type": "application/json; charset=utf-8",
+  "Cache-Control": "no-store",
 };
 const encoder = new TextEncoder();
 
@@ -32,7 +33,7 @@ async function verifyPassword(password, stored) {
 }
 
 async function createSession(user, env) {
-  const payload = base64url(encoder.encode(JSON.stringify({ sub: user.id, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7 })));
+  const payload = base64url(encoder.encode(JSON.stringify({ sub: user.id, ver: user.auth_version || 0, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7 })));
   return `${payload}.${await hmac(payload, env.AUTH_SECRET)}`;
 }
 
@@ -42,8 +43,10 @@ async function currentUser(request, env) {
   if (!payload || !signature || signature !== await hmac(payload, env.AUTH_SECRET)) return null;
   try {
     const session = JSON.parse(new TextDecoder().decode(fromBase64url(payload)));
-    if (!Number.isInteger(session.sub) || session.exp < Math.floor(Date.now() / 1000)) return null;
-    return await env.DB.prepare("SELECT id, name, email FROM users WHERE id = ?").bind(session.sub).first();
+    if (!Number.isInteger(session.sub) || !Number.isFinite(session.exp) || session.exp <= Math.floor(Date.now() / 1000)) return null;
+    const user = await env.DB.prepare("SELECT u.id, u.name, u.email, COALESCE(s.auth_version, 0) AS auth_version FROM users u LEFT JOIN user_settings s ON s.user_id = u.id WHERE u.id = ?").bind(session.sub).first();
+    if (!user || (session.ver || 0) !== user.auth_version) return null;
+    return user;
   } catch { return null; }
 }
 
@@ -103,7 +106,7 @@ async function register(request, env) {
 async function login(request, env) {
   const body = await parseJson(request); const email = body?.email?.trim().toLowerCase(); const password = body?.password;
   if (!validEmail(email) || typeof password !== "string") return json({ error: "E-mail ou senha inválidos." }, 400);
-  const user = await env.DB.prepare("SELECT id, name, email, password_hash FROM users WHERE email = ?").bind(email).first();
+  const user = await env.DB.prepare("SELECT u.id, u.name, u.email, u.password_hash, COALESCE(s.auth_version, 0) AS auth_version FROM users u LEFT JOIN user_settings s ON s.user_id = u.id WHERE u.email = ?").bind(email).first();
   if (!user || !await verifyPassword(password, user.password_hash)) return json({ error: "E-mail ou senha incorretos." }, 401);
   return json({ token: await createSession(user, env), user: { name: user.name, email: user.email } });
 }
@@ -135,13 +138,64 @@ async function resetPassword(request, env) {
   await env.DB.batch([
     env.DB.prepare("UPDATE users SET password_hash = ? WHERE id = ?").bind(await hashPassword(password), user.id),
     env.DB.prepare("UPDATE password_reset_codes SET used_at = CURRENT_TIMESTAMP WHERE user_id = ? AND used_at IS NULL").bind(user.id),
+    env.DB.prepare("INSERT INTO user_settings (user_id, auth_version) VALUES (?, 1) ON CONFLICT(user_id) DO UPDATE SET auth_version = auth_version + 1").bind(user.id),
   ]);
   return json({ ok: true, message: "Senha atualizada. Agora entre com a nova senha." });
 }
 
 async function me(request, env) {
   const result = await requireDevice(request, env); if (result.response) return result.response;
-  return json({ user: result.user, device: result.device });
+  const settings = await env.DB.prepare("SELECT avatar, theme FROM user_settings WHERE user_id = ?").bind(result.user.id).first();
+  return json({ user: { id: result.user.id, name: result.user.name, email: result.user.email, avatar: settings?.avatar || null, theme: settings?.theme || "system" }, device: result.device });
+}
+
+// Profile images are small JPEG data URLs, never arbitrary remote URLs or SVG.
+function validAvatar(value) {
+  if (value === null) return true;
+  if (typeof value !== "string" || value.length > 140000 || !/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(value)) return false;
+  try {
+    const bytes = atob(value.slice("data:image/jpeg;base64,".length));
+    return bytes.length <= 100000 && bytes.length >= 4 && bytes.charCodeAt(0) === 255 && bytes.charCodeAt(1) === 216 && bytes.charCodeAt(bytes.length - 2) === 255 && bytes.charCodeAt(bytes.length - 1) === 217;
+  } catch { return false; }
+}
+
+async function updateAccount(request, env) {
+  const user = await currentUser(request, env);
+  if (!user) return unauthorized();
+  if (Number(request.headers.get("Content-Length")) > 150000) return json({ error: "A imagem é muito grande." }, 413);
+  const raw = await request.text();
+  if (raw.length > 150000) return json({ error: "A imagem é muito grande." }, 413);
+  let body; try { body = JSON.parse(raw); } catch { return json({ error: "Envie as preferências em JSON." }, 400); }
+  if (!body || typeof body !== "object" || Array.isArray(body)) return json({ error: "Preferências inválidas." }, 400);
+  const hasAvatar = Object.hasOwn(body, "avatar");
+  const hasTheme = Object.hasOwn(body, "theme");
+  if ((!hasAvatar && !hasTheme) || (hasAvatar && !validAvatar(body.avatar)) || (hasTheme && !["light", "dark", "system"].includes(body.theme))) return json({ error: "Envie uma foto JPEG válida ou um tema disponível." }, 400);
+  // Separate column updates preserve settings when two requests arrive together.
+  const statements = [env.DB.prepare("INSERT OR IGNORE INTO user_settings (user_id) VALUES (?)").bind(user.id)];
+  if (hasAvatar) statements.push(env.DB.prepare("UPDATE user_settings SET avatar = ? WHERE user_id = ?").bind(body.avatar, user.id));
+  if (hasTheme) statements.push(env.DB.prepare("UPDATE user_settings SET theme = ? WHERE user_id = ?").bind(body.theme, user.id));
+  await env.DB.batch(statements);
+  return json({ ok: true });
+}
+
+async function changePassword(request, env) {
+  const user = await currentUser(request, env);
+  if (!user) return unauthorized();
+  const body = await parseJson(request);
+  if (typeof body?.current_password !== "string" || typeof body?.new_password !== "string" || body.new_password.length < 8 || body.new_password.length > 128) return json({ error: "Informe a senha atual e uma nova senha entre 8 e 128 caracteres." }, 400);
+  const stored = await env.DB.prepare("SELECT password_hash FROM users WHERE id = ?").bind(user.id).first();
+  if (!stored || !await verifyPassword(body.current_password, stored.password_hash)) return json({ error: "A senha atual não está correta." }, 403);
+  if (body.current_password === body.new_password) return json({ error: "Escolha uma senha diferente da atual." }, 400);
+  const newHash = await hashPassword(body.new_password);
+  // Optimistic check prevents concurrent password changes from reusing an old hash.
+  const results = await env.DB.batch([
+    env.DB.prepare("UPDATE users SET password_hash = ? WHERE id = ? AND password_hash = ?").bind(newHash, user.id, stored.password_hash),
+    env.DB.prepare("INSERT INTO user_settings (user_id, auth_version) SELECT id, 1 FROM users WHERE id = ? AND password_hash = ? ON CONFLICT(user_id) DO UPDATE SET auth_version = auth_version + 1").bind(user.id, newHash),
+    env.DB.prepare("UPDATE password_reset_codes SET used_at = CURRENT_TIMESTAMP WHERE user_id = ? AND used_at IS NULL AND EXISTS (SELECT 1 FROM users WHERE id = ? AND password_hash = ?)").bind(user.id, user.id, newHash),
+  ]);
+  if (!results[0].meta.changes) return json({ error: "A senha foi alterada em outra sessão. Entre novamente." }, 409);
+  const version = await env.DB.prepare("SELECT auth_version FROM user_settings WHERE user_id = ?").bind(user.id).first();
+  return json({ ok: true, token: await createSession({ ...user, auth_version: version.auth_version }, env), message: "Senha alterada. As outras sessões foram encerradas." });
 }
 
 async function rotateDeviceKey(request, env) {
@@ -205,6 +259,8 @@ export default { async fetch(request, env) {
   if (request.method === "POST" && path === "/api/auth/reset-password") return resetPassword(request, env);
   if (request.method === "POST" && path === "/api/leituras") return postReading(request, env);
   if (request.method === "GET" && path === "/api/me") return me(request, env);
+  if (request.method === "POST" && path === "/api/account") return updateAccount(request, env);
+  if (request.method === "POST" && path === "/api/account/password") return changePassword(request, env);
   if (request.method === "POST" && path === "/api/dispositivos/chave") return rotateDeviceKey(request, env);
   if (request.method === "GET" && path === "/api/consumo/hoje") return dashboardToday(request, env);
   if (request.method === "GET" && path === "/api/consumo/diario") return dashboardDaily(request, env);

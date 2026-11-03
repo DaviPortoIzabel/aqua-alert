@@ -1,20 +1,9 @@
-const API_BASE = "https://aqua-alert-api.davipizabel.workers.dev";
-const tokenKey = "aqua-alert-token";
 const deviceKey = "aqua-alert-new-device";
 
-function token() { return localStorage.getItem(tokenKey); }
-function setToken(value) { localStorage.setItem(tokenKey, value); }
-function logout() { localStorage.removeItem(tokenKey); localStorage.removeItem(deviceKey); window.location.href = "auth.html"; }
+function token() { return window.AquaAccount.token(); }
+function setToken(value) { window.AquaAccount.setToken(value); }
 function showStatus(message, type = "") { const element = document.querySelector("#status"); if (element) { element.textContent = message; element.className = `status ${type}`; } }
-async function api(path, options = {}) {
-  const requestHeaders = { "Content-Type": "application/json", ...(options.headers || {}) };
-  if (token()) requestHeaders.Authorization = `Bearer ${token()}`;
-  const response = await fetch(`${API_BASE}${path}`, { ...options, headers: requestHeaders });
-  const body = await response.json().catch(() => ({}));
-  if (response.status === 401) { localStorage.removeItem(tokenKey); if (!location.pathname.endsWith("auth.html")) location.href = "auth.html"; }
-  if (!response.ok) throw new Error(body.error || "Não foi possível concluir a operação.");
-  return body;
-}
+function api(path, options = {}) { return window.AquaAccount.request(path, options); }
 
 function showDeviceCredentials(device) {
   const box = document.querySelector("#deviceCredentials");
@@ -34,6 +23,8 @@ function installCopyButtons() {
 let dailyChart; let weeklyChart;
 function renderChart(current, canvasId, labels, values, color) {
   if (current) current.destroy();
+  Chart.defaults.color = window.AquaAccount.theme() === "dark" ? "#b6cddd" : "#526b78";
+  Chart.defaults.borderColor = window.AquaAccount.theme() === "dark" ? "#294459" : "#e4eef3";
   return new Chart(document.querySelector(canvasId), { type: "bar", data: { labels, datasets: [{ data: values, backgroundColor: color, borderRadius: 6 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, title: { display: true, text: "Litros" } } } } });
 }
 function renderHistory(rows) {
@@ -55,25 +46,29 @@ async function refreshDashboard() {
   } catch (error) { showStatus(error.message, "error"); }
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   installCopyButtons();
+  await window.AquaAccount.ready;
   if (location.pathname.endsWith("/") || location.pathname.endsWith("index.html")) {
-    if (token()) api("/api/me").then(() => { location.href = "dashboard.html"; }).catch(() => {});
+    if (token()) location.replace("dashboard.html");
     return;
   }
   if (location.pathname.endsWith("auth.html")) {
     if (token()) { location.href = "dashboard.html"; return; }
     document.querySelector("#loginForm").addEventListener("submit", async (event) => { event.preventDefault(); showStatus("Entrando…"); try { const data = await api("/api/auth/login", { method: "POST", body: JSON.stringify({ email: document.querySelector("#loginEmail").value, password: document.querySelector("#loginPassword").value }) }); setToken(data.token); location.href = "dashboard.html"; } catch (error) { showStatus(error.message, "error"); } });
-    document.querySelector("#registerForm").addEventListener("submit", async (event) => { event.preventDefault(); showStatus("Criando sua conta…"); try { const data = await api("/api/auth/register", { method: "POST", body: JSON.stringify({ name: document.querySelector("#registerName").value, email: document.querySelector("#registerEmail").value, password: document.querySelector("#registerPassword").value }) }); setToken(data.token); localStorage.setItem(deviceKey, JSON.stringify(data.device)); showDeviceCredentials(data.device); } catch (error) { showStatus(error.message, "error"); } });
+    document.querySelector("#registerForm").addEventListener("submit", async (event) => { event.preventDefault(); showStatus("Criando sua conta…"); try { const data = await api("/api/auth/register", { method: "POST", body: JSON.stringify({ name: document.querySelector("#registerName").value, email: document.querySelector("#registerEmail").value, password: document.querySelector("#registerPassword").value }) }); setToken(data.token); window.AquaAccount.refresh(); localStorage.setItem(deviceKey, JSON.stringify(data.device)); showDeviceCredentials(data.device); } catch (error) { showStatus(error.message, "error"); } });
     document.querySelector("#forgotPasswordButton").addEventListener("click", () => { document.querySelector("#passwordRecovery").hidden = false; document.querySelector("#forgotEmail").focus(); });
     document.querySelector("#forgotForm").addEventListener("submit", async (event) => { event.preventDefault(); const email = document.querySelector("#forgotEmail").value.trim(); showStatus("Enviando código…"); try { const data = await api("/api/auth/forgot-password", { method: "POST", body: JSON.stringify({ email }) }); document.querySelector("#resetEmail").value = email; document.querySelector("#resetForm").hidden = false; showStatus(data.message, "success"); } catch (error) { showStatus(error.message, "error"); } });
     document.querySelector("#resetForm").addEventListener("submit", async (event) => { event.preventDefault(); showStatus("Atualizando senha…"); try { const data = await api("/api/auth/reset-password", { method: "POST", body: JSON.stringify({ email: document.querySelector("#resetEmail").value, code: document.querySelector("#resetCode").value, password: document.querySelector("#resetPassword").value }) }); showStatus(data.message, "success"); document.querySelector("#loginEmail").value = document.querySelector("#resetEmail").value; document.querySelector("#passwordRecovery").hidden = true; } catch (error) { showStatus(error.message, "error"); } });
     document.querySelector("#backToLogin").addEventListener("click", () => { document.querySelector("#passwordRecovery").hidden = true; showStatus(""); });
     return;
   }
-  if (!token()) { location.href = "auth.html"; return; }
-  document.querySelector("#refreshButton").addEventListener("click", refreshDashboard); document.querySelector("#logoutButton").addEventListener("click", logout);
+  if (!location.pathname.endsWith("dashboard.html")) return;
+  if (!token()) { location.replace("auth.html"); return; }
+  document.querySelector("#refreshButton").addEventListener("click", refreshDashboard);
   document.querySelector("#rotateKeyButton").addEventListener("click", async () => { if (!confirm("Gerar uma nova chave? O ESP antigo deixará de enviar dados até ser atualizado.")) return; try { const data = await api("/api/dispositivos/chave", { method: "POST" }); showDeviceCredentials(data.device); } catch (error) { showStatus(error.message, "error"); } });
   try { const pending = JSON.parse(localStorage.getItem(deviceKey) || "null"); if (pending) showDeviceCredentials(pending); } catch { /* sem credencial pendente */ }
   refreshDashboard();
 });
+
+document.addEventListener("aqua-theme-change", () => { if (dailyChart || weeklyChart) refreshDashboard(); });
