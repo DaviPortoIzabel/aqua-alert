@@ -249,6 +249,29 @@ async function history(request, env) {
   return json(rows.results);
 }
 
+function validDate(value) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+async function dashboardRange(request, env) {
+  const result = await requireDevice(request, env); if (result.response) return result.response;
+  const url = new URL(request.url);
+  const start = url.searchParams.get("start"); const end = url.searchParams.get("end");
+  if (!validDate(start) || !validDate(end)) return json({ error: "Informe datas válidas no formato AAAA-MM-DD." }, 400);
+  if (start > end) return json({ error: "A data inicial deve ser anterior ou igual à data final." }, 400);
+  if (end > dateKey(new Date())) return json({ error: "A data final não pode estar no futuro." }, 400);
+  const calendarDays = Math.round((new Date(`${end}T00:00:00Z`) - new Date(`${start}T00:00:00Z`)) / 86400000) + 1;
+  if (calendarDays > 3660) return json({ error: "Escolha um período de até 10 anos." }, 400);
+  const nextDay = new Date(`${end}T00:00:00Z`); nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+  const rows = await env.DB.prepare("SELECT substr(measured_at, 1, 10) AS date, SUM(liters) AS liters, COUNT(*) AS readings, MAX(measured_at) AS last_reading FROM readings WHERE device_id = ? AND measured_at >= ? AND measured_at < ? GROUP BY substr(measured_at, 1, 10) ORDER BY date ASC").bind(result.device.id, `${start} 00:00:00`, `${nextDay.toISOString().slice(0, 10)} 00:00:00`).all();
+  const days = rows.results.map(row => ({ ...row, liters: Number(row.liters), readings: Number(row.readings) }));
+  const total = days.reduce((sum, day) => sum + day.liters, 0);
+  const peak = days.reduce((best, day) => !best || day.liters > best.liters ? day : best, null);
+  return json({ start, end, calendar_days: calendarDays, days, summary: { total_liters: Math.round(total * 1000) / 1000, recorded_days: days.length, readings: days.reduce((sum, day) => sum + day.readings, 0), average_liters: days.length ? Math.round(total / days.length * 1000) / 1000 : null, peak: peak ? { date: peak.date, liters: peak.liters } : null } });
+}
+
 export default { async fetch(request, env) {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers });
   const path = new URL(request.url).pathname;
@@ -262,6 +285,7 @@ export default { async fetch(request, env) {
   if (request.method === "POST" && path === "/api/account") return updateAccount(request, env);
   if (request.method === "POST" && path === "/api/account/password") return changePassword(request, env);
   if (request.method === "POST" && path === "/api/dispositivos/chave") return rotateDeviceKey(request, env);
+  if (request.method === "GET" && path === "/api/consumo/periodo") return dashboardRange(request, env);
   if (request.method === "GET" && path === "/api/consumo/hoje") return dashboardToday(request, env);
   if (request.method === "GET" && path === "/api/consumo/diario") return dashboardDaily(request, env);
   if (request.method === "GET" && path === "/api/consumo/semanal") return dashboardWeekly(request, env);

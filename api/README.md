@@ -87,3 +87,25 @@ node --test api/tests/account.test.mjs
 Os testes criam contas descartáveis apenas na API local (porta 8787 por padrão).
 Cobrem persistência após novo login, isolamento entre usuários, remoção e validação
 da foto, preferências concorrentes e revogação de sessões na troca de senha.
+
+## Consumo por período
+
+`GET /api/consumo/periodo?start=AAAA-MM-DD&end=AAAA-MM-DD` exige a sessão do
+usuário e retorna apenas o seu dispositivo. Ambas as datas são inclusivas e usam
+o horário de São Paulo. Datas inválidas, invertidas, futuras ou intervalos com
+mais de 3.660 dias retornam HTTP 400.
+
+A resposta contém `days` (totais diários, quantidade de leituras e última medição)
+e `summary` (total, dias com leituras, média por dia com leitura e maior total
+diário). Dias sem medições não são tratados como consumo zero. O novo dashboard
+usa esse endpoint para gráfico, indicadores, histórico paginado e exportação CSV;
+intervalos acima de 92 dias são agrupados por mês somente na visualização.
+
+Não há migration adicional para este endpoint: ele usa o índice existente
+`idx_readings_device_time`. Publique o Worker antes dos arquivos do dashboard.
+
+Testes locais da API, incluindo os filtros de datas:
+
+```sh
+node --test api/tests/*.test.mjs
+```
