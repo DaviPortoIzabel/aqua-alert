@@ -1,7 +1,7 @@
 const headers = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Authorization, Content-Type, X-Device-Key",
+  "Access-Control-Allow-Headers": "Authorization, Content-Type, X-Device-Key, X-Device-Access",
   "Content-Type": "application/json; charset=utf-8",
   "Cache-Control": "no-store",
 };
@@ -43,7 +43,7 @@ async function currentUser(request, env) {
   if (!payload || !signature || signature !== await hmac(payload, env.AUTH_SECRET)) return null;
   try {
     const session = JSON.parse(new TextDecoder().decode(fromBase64url(payload)));
-    if (!Number.isInteger(session.sub) || !Number.isFinite(session.exp) || session.exp <= Math.floor(Date.now() / 1000)) return null;
+    if (session.scope || !Number.isInteger(session.sub) || !Number.isFinite(session.exp) || session.exp <= Math.floor(Date.now() / 1000)) return null;
     const user = await env.DB.prepare("SELECT u.id, u.name, u.email, COALESCE(s.auth_version, 0) AS auth_version FROM users u LEFT JOIN user_settings s ON s.user_id = u.id WHERE u.id = ?").bind(session.sub).first();
     if (!user || (session.ver || 0) !== user.auth_version) return null;
     return user;
@@ -70,7 +70,11 @@ function newDeviceId() { return `ESP-${randomText(6).toUpperCase().replaceAll("_
 async function createDevice(ownerId, env) {
   const id = newDeviceId();
   const key = randomText(32);
-  await env.DB.prepare("INSERT INTO devices (id, name, owner_id, device_key_hash) VALUES (?, ?, ?, ?)").bind(id, "Meu ESP", ownerId, await sha256(key)).run();
+  const encrypted = await encryptDeviceKey(key, ownerId, id, env);
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO devices (id, name, owner_id, device_key_hash) VALUES (?, ?, ?, ?)").bind(id, "Meu ESP", ownerId, await sha256(key)),
+    env.DB.prepare("INSERT INTO device_secrets (device_id, encrypted_key) VALUES (?, ?)").bind(id, encrypted),
+  ]);
   return { name: "Meu ESP", api_key: key };
 }
 
@@ -198,10 +202,51 @@ async function changePassword(request, env) {
   return json({ ok: true, token: await createSession({ ...user, auth_version: version.auth_version }, env), message: "Senha alterada. As outras sessões foram encerradas." });
 }
 
+async function deviceEncryptionKey(env) {
+  const material = await crypto.subtle.importKey("raw", encoder.encode(env.AUTH_SECRET), "HKDF", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey({ name: "HKDF", hash: "SHA-256", salt: encoder.encode("aqua-alert-device-storage-v1"), info: encoder.encode("encrypted-device-key") }, material, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+}
+async function encryptDeviceKey(value, userId, deviceId, env) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: encoder.encode(`${userId}:${deviceId}`) }, await deviceEncryptionKey(env), encoder.encode(value));
+  return `${base64url(iv)}.${base64url(new Uint8Array(encrypted))}`;
+}
+async function decryptDeviceKey(value, userId, deviceId, env) {
+  const [iv, data] = value.split(".");
+  const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromBase64url(iv), additionalData: encoder.encode(`${userId}:${deviceId}`) }, await deviceEncryptionKey(env), fromBase64url(data));
+  return new TextDecoder().decode(plain);
+}
+async function validDeviceAccess(request, user, device, env) {
+  try {
+    const [payload, signature] = (request.headers.get("X-Device-Access") || "").split(".");
+    if (!payload || !signature || signature !== await hmac(payload, env.AUTH_SECRET)) return false;
+    const proof = JSON.parse(new TextDecoder().decode(fromBase64url(payload)));
+    return proof.scope === "device-access" && proof.sub === user.id && proof.device === device.id && proof.ver === user.auth_version && Number.isFinite(proof.exp) && proof.exp > Math.floor(Date.now() / 1000);
+  } catch { return false; }
+}
+async function unlockDevice(request, env) {
+  const result = await requireDevice(request, env); if (result.response) return result.response;
+  const body = await parseJson(request);
+  if (typeof body?.password !== "string" || !body.password || body.password.length > 128) return json({ error: "Informe sua senha para acessar o dispositivo." }, 400);
+  const now = Math.floor(Date.now() / 1000);
+  const attempt = await env.DB.prepare("INSERT INTO device_unlock_attempts (user_id, attempts, window_start) VALUES (?, 1, ?) ON CONFLICT(user_id) DO UPDATE SET attempts = CASE WHEN window_start <= ? THEN 1 ELSE attempts + 1 END, window_start = CASE WHEN window_start <= ? THEN excluded.window_start ELSE window_start END RETURNING attempts").bind(result.user.id, now, now - 600, now - 600).first();
+  if (attempt.attempts > 5) return json({ error: "Muitas tentativas. Aguarde 10 minutos antes de tentar novamente." }, 429);
+  const stored = await env.DB.prepare("SELECT password_hash FROM users WHERE id = ?").bind(result.user.id).first();
+  if (!await verifyPassword(body.password, stored.password_hash)) return json({ error: "Senha incorreta. Confira a senha da sua conta." }, 403);
+  await env.DB.prepare("DELETE FROM device_unlock_attempts WHERE user_id = ?").bind(result.user.id).run();
+  const secret = await env.DB.prepare("SELECT encrypted_key FROM device_secrets WHERE device_id = ?").bind(result.device.id).first();
+  const payload = base64url(encoder.encode(JSON.stringify({ scope: "device-access", sub: result.user.id, device: result.device.id, ver: result.user.auth_version, exp: now + 180 })));
+  return json({ device: { ...result.device, api_key: secret ? await decryptDeviceKey(secret.encrypted_key, result.user.id, result.device.id, env) : null }, access_token: `${payload}.${await hmac(payload, env.AUTH_SECRET)}`, expires_at: now + 180 });
+}
 async function rotateDeviceKey(request, env) {
   const result = await requireDevice(request, env); if (result.response) return result.response;
+  if (!await validDeviceAccess(request, result.user, result.device, env)) return json({ error: "Confirme sua senha novamente para acessar o ESP." }, 403);
   const key = randomText(32);
-  await env.DB.prepare("UPDATE devices SET device_key_hash = ? WHERE id = ? AND owner_id = ?").bind(await sha256(key), result.device.id, result.user.id).run();
+  const encrypted = await encryptDeviceKey(key, result.user.id, result.device.id, env);
+  await env.DB.batch([
+    env.DB.prepare("UPDATE devices SET device_key_hash = ? WHERE id = ? AND owner_id = ?").bind(await sha256(key), result.device.id, result.user.id),
+    env.DB.prepare("INSERT INTO device_secrets (device_id, encrypted_key) VALUES (?, ?) ON CONFLICT(device_id) DO UPDATE SET encrypted_key = excluded.encrypted_key").bind(result.device.id, encrypted),
+  ]);
   return json({ device: { ...result.device, api_key: key } });
 }
 
@@ -264,12 +309,25 @@ async function dashboardRange(request, env) {
   if (end > dateKey(new Date())) return json({ error: "A data final não pode estar no futuro." }, 400);
   const calendarDays = Math.round((new Date(`${end}T00:00:00Z`) - new Date(`${start}T00:00:00Z`)) / 86400000) + 1;
   if (calendarDays > 3660) return json({ error: "Escolha um período de até 10 anos." }, 400);
+  const requested = url.searchParams.get("granularity") || "auto";
+  if (!["auto", "hour", "day", "month"].includes(requested)) return json({ error: "Escolha um agrupamento disponível." }, 400);
+  const granularity = requested === "auto" ? (calendarDays < 3 ? "hour" : calendarDays > 92 ? "month" : "day") : requested;
+  if (granularity === "hour" && calendarDays > 31) return json({ error: "A visualização por hora está disponível para períodos de até 31 dias. Escolha diário, mensal ou automático." }, 400);
   const nextDay = new Date(`${end}T00:00:00Z`); nextDay.setUTCDate(nextDay.getUTCDate() + 1);
   const rows = await env.DB.prepare("SELECT substr(measured_at, 1, 10) AS date, SUM(liters) AS liters, COUNT(*) AS readings, MAX(measured_at) AS last_reading FROM readings WHERE device_id = ? AND measured_at >= ? AND measured_at < ? GROUP BY substr(measured_at, 1, 10) ORDER BY date ASC").bind(result.device.id, `${start} 00:00:00`, `${nextDay.toISOString().slice(0, 10)} 00:00:00`).all();
   const days = rows.results.map(row => ({ ...row, liters: Number(row.liters), readings: Number(row.readings) }));
   const total = days.reduce((sum, day) => sum + day.liters, 0);
   const peak = days.reduce((best, day) => !best || day.liters > best.liters ? day : best, null);
-  return json({ start, end, calendar_days: calendarDays, days, summary: { total_liters: Math.round(total * 1000) / 1000, recorded_days: days.length, readings: days.reduce((sum, day) => sum + day.readings, 0), average_liters: days.length ? Math.round(total / days.length * 1000) / 1000 : null, peak: peak ? { date: peak.date, liters: peak.liters } : null } });
+  let points;
+  if (granularity === "hour") {
+    const hourly = await env.DB.prepare("SELECT substr(measured_at, 1, 13) || ':00' AS period, SUM(liters) AS liters, COUNT(*) AS readings FROM readings WHERE device_id = ? AND measured_at >= ? AND measured_at < ? GROUP BY substr(measured_at, 1, 13) ORDER BY period ASC").bind(result.device.id, `${start} 00:00:00`, `${nextDay.toISOString().slice(0, 10)} 00:00:00`).all();
+    points = hourly.results.map(row => ({ ...row, liters: Number(row.liters), readings: Number(row.readings) }));
+  } else if (granularity === "month") {
+    const months = new Map();
+    days.forEach(day => { const period = day.date.slice(0, 7); const entry = months.get(period) || { period, liters: 0, readings: 0 }; entry.liters += day.liters; entry.readings += day.readings; months.set(period, entry); });
+    points = [...months.values()];
+  } else points = days.map(day => ({ period: day.date, liters: day.liters, readings: day.readings }));
+  return json({ start, end, calendar_days: calendarDays, days, series: { granularity, points }, summary: { total_liters: Math.round(total * 1000) / 1000, recorded_days: days.length, readings: days.reduce((sum, day) => sum + day.readings, 0), average_liters: days.length ? Math.round(total / days.length * 1000) / 1000 : null, peak: peak ? { date: peak.date, liters: peak.liters } : null } });
 }
 
 export default { async fetch(request, env) {
@@ -284,6 +342,7 @@ export default { async fetch(request, env) {
   if (request.method === "GET" && path === "/api/me") return me(request, env);
   if (request.method === "POST" && path === "/api/account") return updateAccount(request, env);
   if (request.method === "POST" && path === "/api/account/password") return changePassword(request, env);
+  if (request.method === "POST" && path === "/api/dispositivos/acesso") return unlockDevice(request, env);
   if (request.method === "POST" && path === "/api/dispositivos/chave") return rotateDeviceKey(request, env);
   if (request.method === "GET" && path === "/api/consumo/periodo") return dashboardRange(request, env);
   if (request.method === "GET" && path === "/api/consumo/hoje") return dashboardToday(request, env);

@@ -109,3 +109,37 @@ Testes locais da API, incluindo os filtros de datas:
 ```sh
 node --test api/tests/*.test.mjs
 ```
+
+## Visualização horária e acesso protegido ao ESP
+
+`/api/consumo/periodo` também aceita `granularity=auto|hour|day|month` e devolve
+`series.granularity` e `series.points`. Automático usa horas para 1 ou 2 dias,
+dias para 3 a 92 dias e meses acima disso. A opção horária manual aceita até
+31 dias. Horas sem leitura continuam ausentes, sem inventar consumo zero.
+
+Antes de publicar esta versão, aplique uma vez (a migration é idempotente):
+
+```sh
+cd api
+wrangler d1 execute aqua-alert --remote --file=migrations/0004_device_access.sql
+wrangler deploy
+```
+
+`POST /api/dispositivos/acesso`, com sessão e `{ "password": "..." }`, verifica
+a senha e libera a chave e uma autorização de acesso por 3 minutos. A autorização
+é limitada ao usuário, dispositivo e versão da senha. Não pode ser usada como
+sessão de login. A rotação em `POST /api/dispositivos/chave` agora exige esse token
+no cabeçalho `X-Device-Access`. Após 5 tentativas incorretas, a confirmação fica
+bloqueada por até 10 minutos; a sessão normal continua válida.
+
+Chaves novas e renovadas são armazenadas com AES-GCM e IV aleatório, usando HKDF
+para derivar uma chave de armazenamento a partir de `AUTH_SECRET`. Usuário e
+identificador do dispositivo são autenticados como dados associados. O hash da
+chave continua sendo usado para autenticar o sensor. Preserve `AUTH_SECRET` nas
+publicações: substituí-lo impede recuperar chaves cifradas com o valor antigo
+(e invalida as sessões). Nesse caso, as chaves devem ser renovadas.
+
+Chaves anteriores a essa migration só possuem hash e não podem ser recuperadas;
+o usuário precisa gerar uma nova uma vez e atualizar o ESP. As leituras e os
+vínculos existentes são preservados. A chave não fica no localStorage: no
+navegador, ela é apagada ao bloquear a seção, sair da página ou expirar o acesso.

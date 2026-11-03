@@ -32,7 +32,7 @@
       submit(event.target, 'Criando sua conta…', async () => {
         const data = await api('/api/auth/register', { session: false, method: 'POST', body: JSON.stringify({ name: $('#registerName').value.trim(), email: $('#registerEmail').value.trim(), password: $('#registerPassword').value }) });
         setToken(data.token); window.AquaAccount.refresh();
-        try { localStorage.setItem(deviceKey, JSON.stringify(data.device)); } catch { /* The key remains visible until navigation. */ }
+        try { localStorage.removeItem(deviceKey); } catch {}
         $('#authMain').hidden = true; $('#passwordRecovery').hidden = true; showStatus(''); showDeviceCredentials(data.device); $('#deviceCredentials h2').tabIndex = -1; $('#deviceCredentials h2').focus();
       });
     });

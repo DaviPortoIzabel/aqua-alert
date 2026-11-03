@@ -12,9 +12,8 @@ function showDeviceCredentials(device) {
   document.querySelector('#espKey').textContent = device.api_key;
   box.hidden = false;
   box.querySelector('[data-copy]')?.removeAttribute('disabled');
-  document.querySelector('#newKeyNotice')?.removeAttribute('hidden');
-  const settings = document.querySelector('.device-settings');
-  if (settings) settings.open = true;
+
+
   if (location.pathname.endsWith('dashboard.html')) localStorage.removeItem(deviceKey);
 }
 document.addEventListener('DOMContentLoaded', async () => {

@@ -36,12 +36,20 @@
     $('#previousPage').disabled = page <= 1; $('#nextPage').disabled = start + pageSize >= days.length;
   }
   function chartData() {
-    const monthly = result.calendar_days > 92;
-    const values = new Map();
-    result.days.forEach(day => { const key = monthly ? day.date.slice(0, 7) : day.date; values.set(key, (values.get(key) || 0) + day.liters); });
+    const granularity = result.series.granularity;
+    const values = new Map(result.series.points.map(point => [point.period, point.liters]));
     const keys = []; let cursor = result.start;
-    while (cursor <= result.end) { const key = monthly ? cursor.slice(0, 7) : cursor; if (keys.at(-1) !== key) keys.push(key); cursor = addDays(cursor, 1); }
-    return { monthly, keys, labels: keys.map(key => monthly ? new Intl.DateTimeFormat('pt-BR', { month: 'short', year: '2-digit', timeZone: 'UTC' }).format(new Date(key + '-01T12:00:00Z')) : key.slice(8, 10) + '/' + key.slice(5, 7)), values: keys.map(key => values.has(key) ? Math.round(values.get(key) * 1000) / 1000 : null) };
+    while (cursor <= result.end) {
+      if (granularity === 'hour') for (let hour = 0; hour < 24; hour++) keys.push(`${cursor} ${String(hour).padStart(2, '0')}:00`);
+      else { const key = granularity === 'month' ? cursor.slice(0, 7) : cursor; if (keys.at(-1) !== key) keys.push(key); }
+      cursor = addDays(cursor, 1);
+    }
+    const labels = keys.map(key => {
+      if (granularity === 'hour') return (result.calendar_days > 1 ? key.slice(8, 10) + '/' + key.slice(5, 7) + ' · ' : '') + key.slice(11);
+      if (granularity === 'month') return new Intl.DateTimeFormat('pt-BR', { month: 'short', year: '2-digit', timeZone: 'UTC' }).format(new Date(key + '-01T12:00:00Z'));
+      return key.slice(8, 10) + '/' + key.slice(5, 7);
+    });
+    return { granularity, keys, labels, values: keys.map(key => values.has(key) ? Math.round(values.get(key) * 1000) / 1000 : null) };
   }
   function drawChart() {
     if (!result) return;
@@ -50,28 +58,29 @@
     if (empty) $('#chartEmpty').innerHTML = 'Nenhuma leitura neste período.<span>Escolha outras datas ou confira a conexão do seu dispositivo.</span>';
     $('#chartEmpty').hidden = !empty; $('#consumptionChart').hidden = empty;
     const data = chartData();
-    $('#chartDescription').textContent = data.monthly ? 'Totais mensais dentro das datas selecionadas' : 'Totais diários dentro das datas selecionadas';
-    $('.chart-footer span:last-child').textContent = data.monthly ? 'Meses sem leituras ficam sem valor no gráfico.' : 'Dias sem leituras ficam sem valor no gráfico.';
+    $('#chartDescription').textContent = ({ hour: 'Totais por hora · horário de São Paulo', day: 'Totais diários dentro das datas selecionadas', month: 'Totais mensais dentro das datas selecionadas' })[data.granularity];
+    $('.chart-footer span:last-child').textContent = ({ hour: 'Horas sem leituras ficam sem valor no gráfico.', day: 'Dias sem leituras ficam sem valor no gráfico.', month: 'Meses sem leituras ficam sem valor no gráfico.' })[data.granularity];
     if (empty) return;
     if (typeof Chart === 'undefined') { $('#consumptionChart').hidden = true; $('#chartEmpty').hidden = false; $('#chartEmpty').textContent = 'Gráfico indisponível. Consulte os valores na tabela abaixo.'; return; }
     const dark = window.AquaAccount.theme() === 'dark';
     const context = $('#consumptionChart').getContext('2d'); const gradient = context.createLinearGradient(0, 0, 0, 310);
     gradient.addColorStop(0, dark ? 'rgba(113,174,218,.27)' : 'rgba(65,130,178,.19)'); gradient.addColorStop(1, 'rgba(65,130,178,0)');
-    chart = new Chart(context, { type: data.monthly ? 'bar' : 'line', data: { labels: data.labels, datasets: [{ label: 'Consumo', data: data.values, borderColor: dark ? '#8dc0e5' : '#3e7da9', backgroundColor: data.monthly ? (dark ? '#5787aa' : '#a4c5df') : gradient, fill: true, borderWidth: 2, tension: .25, spanGaps: false, pointRadius: data.keys.length > 40 ? 0 : 3, pointHoverRadius: 6, borderRadius: 6, maxBarThickness: 50 }] }, options: { responsive: true, maintainAspectRatio: false, animation: matchMedia('(prefers-reduced-motion: reduce)').matches ? false : { duration: 300 }, interaction: { intersect: false, mode: 'index' }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: item => ` ${liters(item.parsed.y)}` } } }, scales: { x: { grid: { display: false }, border: { display: false }, ticks: { color: dark ? '#9bb6ca' : '#7d93a4', maxTicksLimit: 10, maxRotation: 0, font: { size: 10 } } }, y: { beginAtZero: true, border: { display: false }, ticks: { color: dark ? '#9bb6ca' : '#7d93a4', maxTicksLimit: 5, callback: value => `${number.format(value)} L`, font: { size: 10 } }, grid: { color: dark ? '#294253' : '#edf2f6' } } } } });
+    const style = $('#chartStyle').value;
+    chart = new Chart(context, { type: style === 'bar' ? 'bar' : 'line', data: { labels: data.labels, datasets: [{ label: 'Consumo', data: data.values, borderColor: dark ? '#8dc0e5' : '#3e7da9', backgroundColor: style === 'bar' ? (dark ? '#5787aa' : '#a4c5df') : gradient, fill: style === 'area', borderWidth: 2, tension: style === 'step' ? 0 : .25, stepped: style === 'step', spanGaps: false, pointRadius: data.keys.length > 100 ? 1.5 : 3, pointHoverRadius: 6, borderRadius: 6, maxBarThickness: 50 }] }, options: { responsive: true, maintainAspectRatio: false, animation: matchMedia('(prefers-reduced-motion: reduce)').matches ? false : { duration: 300 }, interaction: { intersect: false, mode: 'index' }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: item => ` ${liters(item.parsed.y)}` } } }, scales: { x: { grid: { display: false }, border: { display: false }, ticks: { color: dark ? '#9bb6ca' : '#7d93a4', maxTicksLimit: 10, maxRotation: 0, font: { size: 10 } } }, y: { beginAtZero: true, border: { display: false }, ticks: { color: dark ? '#9bb6ca' : '#7d93a4', maxTicksLimit: 5, callback: value => `${number.format(value)} L`, font: { size: 10 } }, grid: { color: dark ? '#294253' : '#edf2f6' } } } } });
   }
   async function load(start = selected?.start || $('#periodStart').value, end = selected?.end || $('#periodEnd').value) {
     if (!start || !end || start > end || end > today()) { $('#filterError').textContent = 'Escolha datas válidas, em ordem, até hoje.'; return; }
     if ((new Date(end) - new Date(start)) / 86400000 >= 3660) { $('#filterError').textContent = 'Escolha um período de até 10 anos.'; return; }
+    const granularity = $('#chartGranularity').value;
+    if (granularity === 'hour' && (new Date(end) - new Date(start)) / 86400000 >= 31) { $('#filterError').textContent = 'Por hora está disponível para até 31 dias. Escolha dia, mês ou automático.'; return; }
     const id = ++requestId;
     $('#filterError').textContent = ''; $('#dashboardData').setAttribute('aria-busy', 'true'); $('#applyPeriod').disabled = true; $('#refreshButton').disabled = true;
     showStatus('Consultando seu consumo…');
     try {
-      const [profile, data] = await Promise.all([api('/api/me'), api(`/api/consumo/periodo?${new URLSearchParams({ start, end })}`)]);
+      const [profile, data] = await Promise.all([api('/api/me'), api(`/api/consumo/periodo?${new URLSearchParams({ start, end, granularity })}`)]);
       if (id !== requestId) return;
-      selected = { start, end }; result = data; page = 1;
+      selected = { start, end, granularity }; result = data; page = 1;
       $('#userName').textContent = profile.user.name; $('#deviceName').textContent = profile.device.name;
-      $('#deviceCredentials').hidden = false;
-      if (!$('#espKey').textContent) $('#espKey').textContent = 'Chave protegida. Gere uma nova somente se precisar reconfigurar seu ESP.';
       $('#periodTotal').textContent = liters(data.summary.total_liters);
       $('#periodAverage').textContent = data.summary.average_liters === null ? '—' : liters(data.summary.average_liters);
       $('#periodPeak').textContent = data.summary.peak ? liters(data.summary.peak.liters) : '—';
@@ -82,12 +91,65 @@
       $('#lastUpdated').textContent = 'Atualizado às ' + new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }).format(new Date());
       $('#exportCsv').disabled = !data.days.length; history(); drawChart();
       showStatus(data.days.length ? 'Período atualizado.' : 'Nenhuma leitura encontrada nas datas selecionadas.', data.days.length ? 'success' : '');
-    } catch (error) { if (id === requestId) showStatus(error.message + (result ? ' Os dados anteriores continuam identificados pelas datas exibidas.' : ''), 'error'); }
+    } catch (error) { if (id === requestId) { $('#chartGranularity').value = selected?.granularity || 'auto'; showStatus(error.message + (result ? ' Os dados anteriores continuam identificados pelas datas exibidas.' : ''), 'error'); } }
     finally { if (id === requestId) { $('#dashboardData').setAttribute('aria-busy', 'false'); $('#applyPeriod').disabled = false; $('#refreshButton').disabled = false; } }
+  }
+  function initializeDeviceAccess() {
+    let proof = null; let expiry = 0; let timer; let generation = 0;
+    const dialog = $('#devicePasswordDialog');
+    function lock() {
+      generation++; proof = null; expiry = 0; clearTimeout(timer);
+      $('#deviceCredentials').hidden = true; $('#openDevice').setAttribute('aria-expanded', 'false');
+      $('#espKey').textContent = ''; $('[data-copy="#espKey"]').disabled = true;
+      $('#newKeyNotice').hidden = true; $('#devicePassword').value = '';
+    }
+    function closePrompt() { generation++; dialog.close(); $('#devicePassword').value = ''; $('#openDevice').focus(); }
+    $('#openDevice').addEventListener('click', () => {
+      if (proof) { lock(); return; }
+      $('#devicePasswordStatus').textContent = ''; $('#devicePassword').value = ''; dialog.showModal(); $('#devicePassword').focus();
+    });
+    $('#cancelDeviceAccess').addEventListener('click', closePrompt);
+    dialog.addEventListener('cancel', event => { event.preventDefault(); closePrompt(); });
+    $('#lockDevice').addEventListener('click', () => { lock(); $('#openDevice').focus(); });
+    $('#devicePasswordForm').addEventListener('submit', async event => {
+      event.preventDefault(); const id = ++generation; $('#confirmDeviceAccess').disabled = true;
+      $('#devicePasswordStatus').textContent = 'Conferindo sua senha…'; $('#devicePasswordStatus').classList.remove('error');
+      try {
+        const data = await api('/api/dispositivos/acesso', { method: 'POST', body: JSON.stringify({ password: $('#devicePassword').value }) });
+        if (id !== generation) return;
+        proof = data.access_token; expiry = data.expires_at; dialog.close();
+        $('#deviceCredentials').hidden = false; $('#openDevice').setAttribute('aria-expanded', 'true');
+        $('#deviceAccessNote').textContent = data.device.api_key ? 'Sua chave foi recuperada com segurança.' : 'Esta chave antiga não pode ser recuperada. Gere uma nova uma vez para poder consultá-la depois. Isso exige atualizar seu ESP.';
+        if (data.device.api_key) showDeviceCredentials(data.device);
+        else $('#espKey').textContent = 'Chave antiga indisponível para consulta.';
+        timer = setTimeout(lock, Math.max(0, expiry * 1000 - Date.now())); $('#lockDevice').focus();
+      } catch (error) { if (id === generation) { $('#devicePasswordStatus').textContent = error.message; $('#devicePasswordStatus').classList.add('error'); } }
+      finally { $('#devicePassword').value = ''; $('#confirmDeviceAccess').disabled = false; }
+    });
+    $('#rotateKeyButton').addEventListener('click', async () => {
+      if (!proof || Date.now() >= expiry * 1000) { lock(); $('#openDevice').click(); return; }
+      if (!confirm('Gerar uma nova chave? A anterior deixará de funcionar. Atualize a configuração do seu ESP.')) return;
+      const id = generation; $('#rotateKeyButton').disabled = true;
+      try {
+        const data = await api('/api/dispositivos/chave', { method: 'POST', headers: { 'X-Device-Access': proof } });
+        if (id !== generation) return;
+        showDeviceCredentials(data.device); $('#newKeyNotice').hidden = false;
+        $('#deviceAccessNote').textContent = 'Chave salva na sua conta e disponível em consultas futuras.';
+      } catch (error) { if (error.status === 403) lock(); showStatus(error.message, 'error'); }
+      finally { $('#rotateKeyButton').disabled = false; }
+    });
+    window.addEventListener('pagehide', lock);
+    window.addEventListener('storage', event => { if (event.key === 'aqua-alert-token') lock(); });
+    // Remove the legacy browser copy; the key is recovered only after password verification.
+    try { localStorage.removeItem('aqua-alert-new-device'); } catch {}
+    lock();
   }
   document.addEventListener('DOMContentLoaded', async () => {
     await window.AquaAccount.ready; if (!token()) { location.replace('auth.html'); return; }
     $('#periodStart').max = $('#periodEnd').max = today(); preset('7d');
+    try { const preference = localStorage.getItem('aqua-alert-chart-style'); if (['area', 'line', 'bar', 'step'].includes(preference)) $('#chartStyle').value = preference; } catch {}
+    $('#chartStyle').addEventListener('change', () => { try { localStorage.setItem('aqua-alert-chart-style', $('#chartStyle').value); } catch {} drawChart(); });
+    $('#chartGranularity').addEventListener('change', () => { if (selected) load(); });
     $('#periodPreset').addEventListener('change', event => preset(event.target.value));
     ['#periodStart', '#periodEnd'].forEach(selector => $(selector).addEventListener('input', () => { $('#periodPreset').value = 'custom'; }));
     $('#periodForm').addEventListener('submit', event => { event.preventDefault(); load($('#periodStart').value, $('#periodEnd').value); });
@@ -98,14 +160,7 @@
       const rows = [['Data', 'Consumo (L)', 'Leituras', 'Última medição (São Paulo)'], ...result.days.map(day => [day.date, String(day.liters).replace('.', ','), day.readings, day.last_reading])];
       const blob = new Blob(['\uFEFF' + rows.map(row => row.join(';')).join('\r\n')], { type: 'text/csv;charset=utf-8' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = `aqua-alert-${result.start}-${result.end}.csv`; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
     });
-    $('#rotateKeyButton').addEventListener('click', async () => {
-      if (!confirm('Gerar uma nova chave? Você precisará atualizar a configuração do seu ESP.')) return;
-      $('#rotateKeyButton').disabled = true;
-      try { const data = await api('/api/dispositivos/chave', { method: 'POST' }); showDeviceCredentials(data.device); showStatus('Nova chave gerada. Copie e atualize seu ESP.', 'success'); }
-      catch (error) { showStatus(error.message, 'error'); }
-      finally { $('#rotateKeyButton').disabled = false; }
-    });
-    try { const pending = JSON.parse(localStorage.getItem(deviceKey) || 'null'); if (pending) showDeviceCredentials(pending); } catch { /* No pending device key. */ }
+    initializeDeviceAccess();
     await load();
   });
   document.addEventListener('aqua-theme-change', () => { if (result) drawChart(); });

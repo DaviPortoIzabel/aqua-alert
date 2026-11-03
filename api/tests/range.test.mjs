@@ -15,9 +15,14 @@ test('inclusive dates use São Paulo boundaries, aggregate totals and isolate de
   }
   await call('/api/leituras', { device: other.device.api_key, body: { litros: 999, medido_em: '2026-01-15T15:00:00Z' }, status: 201 });
   const single = await call('/api/consumo/periodo?start=2026-01-15&end=2026-01-15', { token: first.token });
+  assert.equal(single.series.granularity, 'hour'); assert.deepEqual(single.series.points.map(p => [p.period, p.liters]), [['2026-01-15 00:00', 2], ['2026-01-15 23:00', 5]]);
   assert.equal(single.summary.total_liters, 7); assert.equal(single.summary.readings, 2); assert.equal(single.calendar_days, 1);
   const range = await call('/api/consumo/periodo?start=2026-01-15&end=2026-01-18', { token: first.token });
   assert.deepEqual(range.days.map(day => day.date), ['2026-01-15', '2026-01-16', '2026-01-18']);
+  assert.equal(range.series.granularity, 'day');
+  const twoDays = await call('/api/consumo/periodo?start=2026-01-15&end=2026-01-16', { token: first.token }); assert.equal(twoDays.series.granularity, 'hour');
+  const threeDays = await call('/api/consumo/periodo?start=2026-01-15&end=2026-01-17', { token: first.token }); assert.equal(threeDays.series.granularity, 'day');
+  const monthly = await call('/api/consumo/periodo?start=2026-01-15&end=2026-01-18&granularity=month', { token: first.token }); assert.equal(monthly.series.points[0].liters, 18);
   assert.equal(range.calendar_days, 4); assert.equal(range.summary.total_liters, 18); assert.equal(range.summary.recorded_days, 3); assert.equal(range.summary.average_liters, 6); assert.deepEqual(range.summary.peak, { date: '2026-01-16', liters: 11 });
   const empty = await call('/api/consumo/periodo?start=2026-02-01&end=2026-07-31', { token: first.token });
   assert.deepEqual(empty.days, []); assert.equal(empty.summary.average_liters, null); assert.equal(empty.summary.peak, null);
@@ -27,7 +32,7 @@ test('inclusive dates use São Paulo boundaries, aggregate totals and isolate de
 test('date ranges require authentication and reject invalid/reversed/future/oversized dates', async () => {
   const account = await user();
   await call('/api/consumo/periodo?start=2026-01-01&end=2026-01-02', { status: 401 });
-  for (const query of ['', 'start=2026-02-30&end=2026-03-01', 'start=2026-01-02&end=2026-01-01', 'start=2026-1-1&end=2026-01-02', 'start=2000-01-01&end=2026-01-01', 'start=2099-01-01&end=2099-01-02']) {
+  for (const query of ['', 'start=2026-02-30&end=2026-03-01', 'start=2026-01-02&end=2026-01-01', 'start=2026-1-1&end=2026-01-02', 'start=2026-01-01&end=2026-02-01&granularity=hour', 'start=2026-01-01&end=2026-01-02&granularity=invalid', 'start=2000-01-01&end=2026-01-01', 'start=2099-01-01&end=2099-01-02']) {
     await call('/api/consumo/periodo?' + query, { token: account.token, status: 400 });
   }
 });
