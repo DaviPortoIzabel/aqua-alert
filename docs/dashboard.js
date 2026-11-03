@@ -100,7 +100,7 @@
     function lock() {
       generation++; proof = null; expiry = 0; clearTimeout(timer);
       $('#deviceCredentials').hidden = true; $('#openDevice').setAttribute('aria-expanded', 'false');
-      $('#espKey').textContent = ''; $('[data-copy="#espKey"]').disabled = true;
+      $('#espKey').textContent = ''; $('#deviceId').textContent = '—'; $('[data-copy="#espKey"]').disabled = true;
       $('#newKeyNotice').hidden = true; $('#devicePassword').value = '';
     }
     function closePrompt() { generation++; dialog.close(); $('#devicePassword').value = ''; $('#openDevice').focus(); }
@@ -119,7 +119,8 @@
         if (id !== generation) return;
         proof = data.access_token; expiry = data.expires_at; dialog.close();
         $('#deviceCredentials').hidden = false; $('#openDevice').setAttribute('aria-expanded', 'true');
-        $('#deviceAccessNote').textContent = data.device.api_key ? 'Sua chave foi recuperada com segurança.' : 'Esta chave antiga não pode ser recuperada. Gere uma nova uma vez para poder consultá-la depois. Isso exige atualizar seu ESP.';
+        $('#deviceId').textContent = data.device.id;
+        $('#deviceAccessNote').textContent = data.device.api_key ? (/^\d{5}$/.test(data.device.api_key) ? '' : 'Esta é sua chave atual. Renove abaixo se quiser trocar por cinco números.') : 'Chave antiga indisponível para consulta. Renove para criar uma chave de cinco números e atualize seu ESP.';
         if (data.device.api_key) showDeviceCredentials(data.device);
         else $('#espKey').textContent = 'Chave antiga indisponível para consulta.';
         timer = setTimeout(lock, Math.max(0, expiry * 1000 - Date.now())); $('#lockDevice').focus();
@@ -128,13 +129,13 @@
     });
     $('#rotateKeyButton').addEventListener('click', async () => {
       if (!proof || Date.now() >= expiry * 1000) { lock(); $('#openDevice').click(); return; }
-      if (!confirm('Gerar uma nova chave? A anterior deixará de funcionar. Atualize a configuração do seu ESP.')) return;
+      if (!confirm('Renovar para uma chave de 5 números? A anterior deixará de funcionar. Configure o identificador e a nova chave no seu ESP.')) return;
       const id = generation; $('#rotateKeyButton').disabled = true;
       try {
         const data = await api('/api/dispositivos/chave', { method: 'POST', headers: { 'X-Device-Access': proof } });
         if (id !== generation) return;
         showDeviceCredentials(data.device); $('#newKeyNotice').hidden = false;
-        $('#deviceAccessNote').textContent = 'Chave salva na sua conta e disponível em consultas futuras.';
+        $('#deviceAccessNote').textContent = ''; $('#deviceId').textContent = data.device.id;
       } catch (error) { if (error.status === 403) lock(); showStatus(error.message, 'error'); }
       finally { $('#rotateKeyButton').disabled = false; }
     });

@@ -143,3 +143,47 @@ Chaves anteriores a essa migration só possuem hash e não podem ser recuperadas
 o usuário precisa gerar uma nova uma vez e atualizar o ESP. As leituras e os
 vínculos existentes são preservados. A chave não fica no localStorage: no
 navegador, ela é apagada ao bloquear a seção, sair da página ou expirar o acesso.
+
+## Chaves de cinco números
+
+Chaves recém-criadas ou renovadas têm exatamente cinco dígitos. Preserve os zeros
+iniciais: a chave é uma **string**, não um número. Para autenticar o sensor, envie
+**identificador e chave** juntos:
+
+```http
+POST /api/leituras
+Content-Type: application/json
+X-Device-Id: ESP-SEU-ID
+X-Device-Key: 01234
+
+{"litros":0.2}
+```
+
+O identificador também pode ser enviado no JSON como `device_id`, mantendo a
+chave no cabeçalho `X-Device-Key`. No firmware com HTTPClient, acrescente:
+
+```cpp
+http.addHeader("X-Device-Id", DEVICE_ID);
+http.addHeader("X-Device-Key", DEVICE_KEY); // string: mantém zeros iniciais
+```
+
+Use a conexão HTTPS com validação de certificado já configurada no firmware.
+Os valores do exemplo são ilustrativos; copie os seus dados pela área Meu ESP.
+Chaves longas existentes continuam funcionando sem esse cabeçalho adicional até
+que o proprietário escolha renová-las. Nenhuma chave existente é trocada no deploy.
+
+Chaves curtas são verificadas por HMAC com o identificador e `AUTH_SECRET`. Cada
+tentativa é reservada de forma atômica no D1; após cinco erros o sensor fica
+bloqueado por até dez minutos. Renovar pela conta, após confirmar a senha, também
+remove esse bloqueio. O armazenamento recuperável continua criptografado.
+
+Antes de publicar esta versão:
+
+```sh
+cd api
+wrangler d1 execute aqua-alert --remote --file=migrations/0005_short_device_codes.sql
+wrangler deploy
+```
+
+Essa migration apenas adiciona o controle de tentativas dos sensores. Ela não
+altera chaves, dispositivos ou leituras existentes.

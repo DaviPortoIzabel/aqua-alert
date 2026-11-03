@@ -1,7 +1,7 @@
 const headers = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Authorization, Content-Type, X-Device-Key, X-Device-Access",
+  "Access-Control-Allow-Headers": "Authorization, Content-Type, X-Device-Key, X-Device-Id, X-Device-Access",
   "Content-Type": "application/json; charset=utf-8",
   "Cache-Control": "no-store",
 };
@@ -67,15 +67,23 @@ async function requireDevice(request, env) {
 
 function newDeviceId() { return `ESP-${randomText(6).toUpperCase().replaceAll("_", "X").replaceAll("-", "Y")}`; }
 
+function newDeviceCode() {
+  const limit = Math.floor(4294967296 / 100000) * 100000;
+  let value;
+  do { value = crypto.getRandomValues(new Uint32Array(1))[0]; } while (value >= limit);
+  return String(value % 100000).padStart(5, "0");
+}
+async function deviceCodeHash(code, deviceId, env) { return hmac(`device-code:v1:${deviceId}:${code}`, env.AUTH_SECRET); }
+
 async function createDevice(ownerId, env) {
   const id = newDeviceId();
-  const key = randomText(32);
+  const key = newDeviceCode();
   const encrypted = await encryptDeviceKey(key, ownerId, id, env);
   await env.DB.batch([
-    env.DB.prepare("INSERT INTO devices (id, name, owner_id, device_key_hash) VALUES (?, ?, ?, ?)").bind(id, "Meu ESP", ownerId, await sha256(key)),
+    env.DB.prepare("INSERT INTO devices (id, name, owner_id, device_key_hash) VALUES (?, ?, ?, ?)").bind(id, "Meu ESP", ownerId, await deviceCodeHash(key, id, env)),
     env.DB.prepare("INSERT INTO device_secrets (device_id, encrypted_key) VALUES (?, ?)").bind(id, encrypted),
   ]);
-  return { name: "Meu ESP", api_key: key };
+  return { id, name: "Meu ESP", api_key: key };
 }
 
 function resetCode() { return String(crypto.getRandomValues(new Uint32Array(1))[0] % 1000000).padStart(6, "0"); }
@@ -241,11 +249,14 @@ async function unlockDevice(request, env) {
 async function rotateDeviceKey(request, env) {
   const result = await requireDevice(request, env); if (result.response) return result.response;
   if (!await validDeviceAccess(request, result.user, result.device, env)) return json({ error: "Confirme sua senha novamente para acessar o ESP." }, 403);
-  const key = randomText(32);
+  const previous = await env.DB.prepare("SELECT encrypted_key FROM device_secrets WHERE device_id = ?").bind(result.device.id).first();
+  const oldKey = previous ? await decryptDeviceKey(previous.encrypted_key, result.user.id, result.device.id, env) : null;
+  let key; do { key = newDeviceCode(); } while (key === oldKey);
   const encrypted = await encryptDeviceKey(key, result.user.id, result.device.id, env);
   await env.DB.batch([
-    env.DB.prepare("UPDATE devices SET device_key_hash = ? WHERE id = ? AND owner_id = ?").bind(await sha256(key), result.device.id, result.user.id),
+    env.DB.prepare("UPDATE devices SET device_key_hash = ? WHERE id = ? AND owner_id = ?").bind(await deviceCodeHash(key, result.device.id, env), result.device.id, result.user.id),
     env.DB.prepare("INSERT INTO device_secrets (device_id, encrypted_key) VALUES (?, ?) ON CONFLICT(device_id) DO UPDATE SET encrypted_key = excluded.encrypted_key").bind(result.device.id, encrypted),
+    env.DB.prepare("DELETE FROM device_code_attempts WHERE device_id = ?").bind(result.device.id),
   ]);
   return json({ device: { ...result.device, api_key: key } });
 }
@@ -255,8 +266,24 @@ async function postReading(request, env) {
   if (!body) return json({ error: "Envie os dados de leitura em JSON." }, 400);
   const deviceKey = request.headers.get("X-Device-Key");
   if (!deviceKey) return unauthorized();
-  const device = await env.DB.prepare("SELECT id FROM devices WHERE device_key_hash = ?").bind(await sha256(deviceKey)).first();
-  if (!device) return unauthorized();
+  let device;
+  if (/^\d{5}$/.test(deviceKey)) {
+    const deviceId = request.headers.get("X-Device-Id") || body.device_id;
+    if (!validDeviceId(deviceId)) return json({ error: "Envie o identificador do ESP junto da chave de 5 números." }, 400);
+    const stored = await env.DB.prepare("SELECT id, device_key_hash FROM devices WHERE id = ?").bind(deviceId).first();
+    if (!stored) return unauthorized();
+    const now = Math.floor(Date.now() / 1000);
+    // Reserve each attempt atomically before checking the small key space.
+    const attempt = await env.DB.prepare("INSERT INTO device_code_attempts (device_id, attempts, window_start) VALUES (?, 1, ?) ON CONFLICT(device_id) DO UPDATE SET attempts = CASE WHEN window_start <= ? THEN 1 ELSE attempts + 1 END, window_start = CASE WHEN window_start <= ? THEN excluded.window_start ELSE window_start END RETURNING attempts").bind(deviceId, now, now - 600, now - 600).first();
+    if (attempt.attempts > 5) return json({ error: "Acesso ao dispositivo temporariamente bloqueado. Aguarde 10 minutos ou gere uma nova chave pela conta." }, 429);
+    if (stored.device_key_hash !== await deviceCodeHash(deviceKey, deviceId, env)) return unauthorized();
+    await env.DB.prepare("DELETE FROM device_code_attempts WHERE device_id = ?").bind(deviceId).run();
+    device = { id: stored.id };
+  } else {
+    // Existing long keys remain valid until their owner explicitly rotates them.
+    device = await env.DB.prepare("SELECT id FROM devices WHERE device_key_hash = ?").bind(await sha256(deviceKey)).first();
+    if (!device) return unauthorized();
+  }
   const flow = body.fluxo ?? body.flow_lpm; let liters = body.litros;
   if (liters === undefined && Number.isFinite(Number(flow))) liters = Number(flow) * Number(body.intervalo_segundos ?? 5) / 60;
   liters = Number(liters);
