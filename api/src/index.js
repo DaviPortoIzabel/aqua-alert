@@ -37,6 +37,8 @@ async function createSession(user, env) {
   return `${payload}.${await hmac(payload, env.AUTH_SECRET)}`;
 }
 
+// auth_version permite revogar sessões antigas sem manter uma lista de tokens.
+// Tokens com scope são autorizações específicas e não podem iniciar uma sessão.
 async function currentUser(request, env) {
   const token = request.headers.get("Authorization")?.replace(/^Bearer\s+/i, "") || "";
   const [payload, signature] = token.split(".");
@@ -50,6 +52,7 @@ async function currentUser(request, env) {
   } catch { return null; }
 }
 
+// Mesmo quando o cliente escolhe device_id, owner_id limita o acesso à conta.
 async function userDevice(userId, url, env) {
   const id = url.searchParams.get("device_id");
   const query = id ? "SELECT id, name FROM devices WHERE id = ? AND owner_id = ?" : "SELECT id, name FROM devices WHERE owner_id = ? ORDER BY created_at LIMIT 1";
@@ -67,6 +70,8 @@ async function requireDevice(request, env) {
 
 function newDeviceId() { return `ESP-${randomText(6).toUpperCase().replaceAll("_", "X").replaceAll("-", "Y")}`; }
 
+// Rejeita a sobra da divisão do espaço de 32 bits para evitar viés no sorteio.
+// Retorna string: códigos como "01234" precisam manter o zero inicial.
 function newDeviceCode() {
   const limit = Math.floor(4294967296 / 100000) * 100000;
   let value;
@@ -210,10 +215,13 @@ async function changePassword(request, env) {
   return json({ ok: true, token: await createSession({ ...user, auth_version: version.auth_version }, env), message: "Senha alterada. As outras sessões foram encerradas." });
 }
 
+// AUTH_SECRET também protege as chaves recuperáveis do ESP. Preservá-lo entre
+// deploys é necessário para decifrar valores já gravados em device_secrets.
 async function deviceEncryptionKey(env) {
   const material = await crypto.subtle.importKey("raw", encoder.encode(env.AUTH_SECRET), "HKDF", false, ["deriveKey"]);
   return crypto.subtle.deriveKey({ name: "HKDF", hash: "SHA-256", salt: encoder.encode("aqua-alert-device-storage-v1"), info: encoder.encode("encrypted-device-key") }, material, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
 }
+// IV novo por cifragem; os dados associados vinculam o segredo à conta e ao ESP.
 async function encryptDeviceKey(value, userId, deviceId, env) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: encoder.encode(`${userId}:${deviceId}`) }, await deviceEncryptionKey(env), encoder.encode(value));
@@ -290,6 +298,7 @@ async function postReading(request, env) {
   if (!Number.isFinite(liters) || liters < 0 || liters > 10000) return json({ error: "litros inválido." }, 400);
   const measured = body.medido_em ? new Date(body.medido_em) : new Date();
   if (Number.isNaN(measured.getTime())) return json({ error: "medido_em inválido." }, 400);
+  // O D1 recebe horário civil de São Paulo; as consultas usam o mesmo calendário.
   const measuredAt = saoPauloDateTime(measured);
   await env.DB.prepare("INSERT INTO readings (device_id, measured_at, liters, flow_lpm) VALUES (?, ?, ?, ?)").bind(device.id, measuredAt, liters, Number.isFinite(Number(flow)) ? Number(flow) : null).run();
   return json({ ok: true, liters, measured_at: measuredAt }, 201);
@@ -340,8 +349,10 @@ async function dashboardRange(request, env) {
   if (!["auto", "hour", "day", "month"].includes(requested)) return json({ error: "Escolha um agrupamento disponível." }, 400);
   const granularity = requested === "auto" ? (calendarDays < 3 ? "hour" : calendarDays > 92 ? "month" : "day") : requested;
   if (granularity === "hour" && calendarDays > 31) return json({ error: "A visualização por hora está disponível para períodos de até 31 dias. Escolha diário, mensal ou automático." }, 400);
+  // Limite exclusivo no dia seguinte inclui todas as horas da data final.
   const nextDay = new Date(`${end}T00:00:00Z`); nextDay.setUTCDate(nextDay.getUTCDate() + 1);
   const rows = await env.DB.prepare("SELECT substr(measured_at, 1, 10) AS date, SUM(liters) AS liters, COUNT(*) AS readings, MAX(measured_at) AS last_reading FROM readings WHERE device_id = ? AND measured_at >= ? AND measured_at < ? GROUP BY substr(measured_at, 1, 10) ORDER BY date ASC").bind(result.device.id, `${start} 00:00:00`, `${nextDay.toISOString().slice(0, 10)} 00:00:00`).all();
+  // Só há linhas para dias com medições: ausência de leitura não é consumo zero.
   const days = rows.results.map(row => ({ ...row, liters: Number(row.liters), readings: Number(row.readings) }));
   const total = days.reduce((sum, day) => sum + day.liters, 0);
   const peak = days.reduce((best, day) => !best || day.liters > best.liters ? day : best, null);
@@ -357,6 +368,8 @@ async function dashboardRange(request, env) {
   return json({ start, end, calendar_days: calendarDays, days, series: { granularity, points }, summary: { total_liters: Math.round(total * 1000) / 1000, recorded_days: days.length, readings: days.reduce((sum, day) => sum + day.readings, 0), average_liters: days.length ? Math.round(total / days.length * 1000) / 1000 : null, peak: peak ? { date: peak.date, liters: peak.liters } : null } });
 }
 
+// Entrada do Worker: preflight CORS e despacho das rotas. A autenticação fica
+// nos handlers para distinguir sessão do usuário de credenciais do sensor.
 export default { async fetch(request, env) {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers });
   const path = new URL(request.url).pathname;

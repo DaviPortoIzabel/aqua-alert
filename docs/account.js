@@ -1,5 +1,6 @@
 (() => {
   'use strict';
+  // Para desenvolver com banco local, veja contributing/DESENVOLVIMENTO.md.
   const BASE = 'https://aqua-alert-api.davipizabel.workers.dev';
   const TOKEN = 'aqua-alert-token';
   const PROFILE = 'aqua-alert-profile';
@@ -27,6 +28,8 @@
     profile = null;
     renderNavigation();
   }
+  // Centraliza a sessão e o tratamento de erros para todas as páginas.
+  // session: false permite login/cadastro sem enviar um token anterior.
   async function request(path, options = {}) {
     const { session = true, ...fetchOptions } = options;
     const headers = { 'Content-Type': 'application/json', ...fetchOptions.headers };

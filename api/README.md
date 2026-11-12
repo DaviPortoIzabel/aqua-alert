@@ -1,5 +1,7 @@
 # API do Aqua Alert
 
+[Visão geral](../README.md) · [Desenvolvimento e testes locais](../contributing/DESENVOLVIMENTO.md) · [Como contribuir](../CONTRIBUTING.md)
+
 API serverless para Cloudflare Workers com banco Cloudflare D1. Ela é independente do Flask: `app.py` permanece intacto.
 
 ## Rotas
@@ -7,7 +9,7 @@ API serverless para Cloudflare Workers com banco Cloudflare D1. Ela é independe
 | Método | Rota | Acesso | Finalidade |
 |---|---|---|---|
 | GET | `/health` | público | confirma se a API está online |
-| POST | `/api/leituras` | `X-Device-Key` | grava leitura do ESP8266 |
+| POST | `/api/leituras` | `X-Device-Key` e, para chaves curtas, `X-Device-Id` | grava leitura do ESP8266 |
 | POST | `/api/auth/register` | público | cria conta e ESP exclusivo |
 | POST | `/api/auth/login` | público | inicia a sessão do usuário |
 | POST | `/api/auth/forgot-password` | público | envia código de redefinição por e-mail |
@@ -17,7 +19,18 @@ API serverless para Cloudflare Workers com banco Cloudflare D1. Ela é independe
 | GET | `/api/consumo/semanal` | Bearer token | gráfico dos últimos 7 dias |
 | GET | `/api/historico` | Bearer token | totais diários |
 
-Cada sessão enxerga somente o dispositivo da própria conta.
+As rotas autenticadas usam `Authorization: Bearer SEU_TOKEN`. Cada sessão enxerga somente o dispositivo da própria conta.
+
+| Método | Outras rotas | Finalidade |
+|---|---|---|
+| GET | `/api/me` | perfil e preferências da conta |
+| POST | `/api/account` | atualizar perfil, foto e tema |
+| POST | `/api/account/password` | trocar senha e revogar sessões anteriores |
+| GET | `/api/consumo/periodo` | consumo por intervalo e granularidade |
+| POST | `/api/dispositivos/acesso` | confirmar senha e liberar acesso temporário ao ESP |
+| POST | `/api/dispositivos/chave` | renovar chave com sessão e `X-Device-Access` |
+
+Essas rotas exigem sessão; os detalhes e requisitos adicionais estão nas seções abaixo.
 
 ## Mensagem do sensor
 
