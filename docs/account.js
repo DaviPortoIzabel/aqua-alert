@@ -1,7 +1,8 @@
 (() => {
   'use strict';
-  // Para desenvolver com banco local, veja contributing/DESENVOLVIMENTO.md.
-  const BASE = 'https://aqua-alert-api.davipizabel.workers.dev';
+  // O Flask injeta a meta para usar a API local. No Pages, mantém a API publicada.
+  const BASE = document.querySelector('meta[name="aqua-api-base"]')?.content
+    ?? 'https://aqua-alert-api.davipizabel.workers.dev';
   const TOKEN = 'aqua-alert-token';
   const PROFILE = 'aqua-alert-profile';
   const THEME = 'aqua-alert-theme';

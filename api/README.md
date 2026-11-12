@@ -2,7 +2,7 @@
 
 [Visão geral](../README.md) · [Desenvolvimento e testes locais](../contributing/DESENVOLVIMENTO.md) · [Como contribuir](../CONTRIBUTING.md)
 
-API serverless para Cloudflare Workers com banco Cloudflare D1. Ela é independente do Flask: `app.py` permanece intacto.
+API serverless para Cloudflare Workers com banco Cloudflare D1. A versão publicada usa esse Worker. Para executar o sistema no computador com Python, use `app.py` e a [API Flask local](../contributing/DESENVOLVIMENTO.md), que atende o mesmo contrato com SQLite.
 
 ## Rotas
 

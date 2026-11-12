@@ -26,7 +26,7 @@ Se você já trabalha no repositório original, atualize `main` com `git pull --
 
 - Mantenha cada PR focado em um problema.
 - Comente o motivo de uma regra ou decisão difícil de perceber; prefira nomes claros a comentários que apenas repetem cada linha.
-- Ao alterar uma rota, atualize a documentação da API e os testes do comportamento afetado.
+- Ao alterar uma rota compartilhada, atualize as implementações Flask (`local_app/`) e Worker (`api/src/index.js`), a documentação e os testes do comportamento afetado.
 - Ao alterar o banco, inclua a migration e atualize `api/schema.sql`.
 - Ao mudar a interface, confira teclado, celular, temas e mensagens de erro.
 - Use dados locais descartáveis. Não inclua senhas, tokens, chaves do ESP ou dados pessoais em código, logs ou capturas.
