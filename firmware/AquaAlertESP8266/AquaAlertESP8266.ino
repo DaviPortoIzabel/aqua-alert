@@ -20,14 +20,16 @@ const unsigned long MEASUREMENT_INTERVAL_MS = 60000; // Envia uma leitura por mi
 const unsigned long WIFI_RETRY_INTERVAL_MS = 30000;
 const float PULSES_PER_LITER = 450.0f; // Calibre este valor caso o sensor usado seja diferente.
 
-// 32 bytes para SSID, 64 para senha e 6 para a chave de cinco digitos.
-const int EEPROM_SIZE = 112;
+// Preserva os enderecos antigos e acrescenta o identificador separado da chave.
+const int EEPROM_SIZE = 192;
 const int SSID_ADDR = 0;
 const int SSID_MAX_LENGTH = 32;
 const int PASSWORD_ADDR = SSID_ADDR + SSID_MAX_LENGTH;
 const int PASSWORD_MAX_LENGTH = 64;
 const int DEVICE_KEY_ADDR = PASSWORD_ADDR + PASSWORD_MAX_LENGTH;
 const int DEVICE_KEY_MAX_LENGTH = 6;
+const int DEVICE_ID_ADDR = DEVICE_KEY_ADDR + DEVICE_KEY_MAX_LENGTH;
+const int DEVICE_ID_MAX_LENGTH = 65;
 
 const byte DNS_PORT = 53;
 ESP8266WebServer server(80);
@@ -36,6 +38,7 @@ DNSServer dnsServer;
 String savedSSID;
 String savedPassword;
 String savedDeviceKey;
+String savedDeviceId;
 volatile unsigned long pulseCount = 0;
 unsigned long lastMeasurementAt = 0;
 unsigned long lastWiFiRetryAt = 0;
@@ -66,12 +69,14 @@ void loadConfiguration() {
   savedSSID = readEEPROMString(SSID_ADDR, SSID_MAX_LENGTH);
   savedPassword = readEEPROMString(PASSWORD_ADDR, PASSWORD_MAX_LENGTH);
   savedDeviceKey = readEEPROMString(DEVICE_KEY_ADDR, DEVICE_KEY_MAX_LENGTH);
+  savedDeviceId = readEEPROMString(DEVICE_ID_ADDR, DEVICE_ID_MAX_LENGTH);
 }
 
-void saveConfiguration(const String &ssid, const String &password, const String &deviceKey) {
+void saveConfiguration(const String &ssid, const String &password, const String &deviceKey, const String &deviceId) {
   writeEEPROMString(SSID_ADDR, SSID_MAX_LENGTH, ssid);
   writeEEPROMString(PASSWORD_ADDR, PASSWORD_MAX_LENGTH, password);
   writeEEPROMString(DEVICE_KEY_ADDR, DEVICE_KEY_MAX_LENGTH, deviceKey);
+  writeEEPROMString(DEVICE_ID_ADDR, DEVICE_ID_MAX_LENGTH, deviceId);
   EEPROM.commit();
 }
 
@@ -88,9 +93,18 @@ bool hasValidDeviceKey(const String &key) {
   return true;
 }
 
+bool hasValidDeviceId(const String &id) {
+  if (id.length() < 6 || id.length() >= DEVICE_ID_MAX_LENGTH) return false;
+  for (unsigned int i = 0; i < id.length(); i++) {
+    const char character = id[i];
+    if (!((character >= 'A' && character <= 'Z') || (character >= '0' && character <= '9') || character == '-')) return false;
+  }
+  return true;
+}
+
 bool connectToSavedWiFi() {
-  if (savedSSID.length() == 0 || !hasValidDeviceKey(savedDeviceKey)) {
-    Serial.println("Wi-Fi ou chave do ESP nao configurados.");
+  if (savedSSID.length() == 0 || !hasValidDeviceKey(savedDeviceKey) || !hasValidDeviceId(savedDeviceId)) {
+    Serial.println("Wi-Fi, identificador ou chave do ESP nao configurados.");
     return false;
   }
 
@@ -116,11 +130,11 @@ bool connectToSavedWiFi() {
 
 String configurationPage(const String &message = "") {
   String html = R"rawliteral(
-<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Cache-Control" content="no-store"><title>Configurar Aqua Alert</title><style>body{font-family:Arial,sans-serif;background:#eef5f7;margin:0;padding:20px}.box{max-width:420px;margin:30px auto;background:#fff;padding:24px;border-radius:14px;box-shadow:0 6px 20px #0002}h1{font-size:22px}label{display:block;margin-top:14px;font-weight:bold}input,button{box-sizing:border-box;width:100%;padding:12px;margin-top:6px;border-radius:8px;font-size:16px}input{border:1px solid #b8c6cb}button{border:0;background:#087f8c;color:#fff;font-weight:bold}.message{padding:10px;border-radius:8px;background:#e2f3f5;color:#075b63}.danger{display:block;margin-top:18px;color:#a52222;text-align:center}</style></head><body><main class="box"><h1>Configurar Aqua Alert</h1><p>Informe os dados da sua rede e a chave/ID de cinco digitos mostrada pelo site.</p>
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Cache-Control" content="no-store"><title>Configurar Aqua Alert</title><style>body{font-family:Arial,sans-serif;background:#eef5f7;margin:0;padding:20px}.box{max-width:420px;margin:30px auto;background:#fff;padding:24px;border-radius:14px;box-shadow:0 6px 20px #0002}h1{font-size:22px}label{display:block;margin-top:14px;font-weight:bold}input,button{box-sizing:border-box;width:100%;padding:12px;margin-top:6px;border-radius:8px;font-size:16px}input{border:1px solid #b8c6cb}button{border:0;background:#087f8c;color:#fff;font-weight:bold}.message{padding:10px;border-radius:8px;background:#e2f3f5;color:#075b63}.danger{display:block;margin-top:18px;color:#a52222;text-align:center}</style></head><body><main class="box"><h1>Configurar Aqua Alert</h1><p>Informe os dados da sua rede e o identificador e a chave de cinco digitos mostrados pelo site.</p>
 )rawliteral";
   if (message.length()) html += "<p class=\"message\">" + message + "</p>";
   html += R"rawliteral(
-<form action="/save" method="post"><label>Nome da rede Wi-Fi (SSID)<input name="ssid" maxlength="31" required></label><label>Senha da rede Wi-Fi<input type="password" name="password" maxlength="63"></label><label>Chave/ID do ESP (5 digitos)<input name="device_key" inputmode="numeric" pattern="[0-9]{5}" minlength="5" maxlength="5" required></label><button type="submit">Salvar e conectar</button></form><a class="danger" href="/reset">Apagar configuracao salva</a></main></body></html>
+<form action="/save" method="post"><label>Nome da rede Wi-Fi (SSID)<input name="ssid" maxlength="31" required></label><label>Senha da rede Wi-Fi<input type="password" name="password" maxlength="63"></label><label>Identificador do ESP<input name="device_id" pattern="[A-Z0-9-]{6,64}" minlength="6" maxlength="64" placeholder="ESP-..." required></label><label>Chave do ESP (5 digitos)<input name="device_key" inputmode="numeric" pattern="[0-9]{5}" minlength="5" maxlength="5" required></label><button type="submit">Salvar e conectar</button></form><a class="danger" href="/reset">Apagar configuracao salva</a></main></body></html>
 )rawliteral";
   return html;
 }
@@ -134,11 +148,12 @@ void handleSave() {
   const String ssid = server.arg("ssid");
   const String password = server.arg("password");
   const String deviceKey = server.arg("device_key");
-  if (ssid.length() == 0 || ssid.length() >= SSID_MAX_LENGTH || password.length() >= PASSWORD_MAX_LENGTH || !hasValidDeviceKey(deviceKey)) {
-    server.send(400, "text/html; charset=utf-8", configurationPage("Confira o SSID, a senha e a chave de cinco digitos."));
+  const String deviceId = server.arg("device_id");
+  if (ssid.length() == 0 || ssid.length() >= SSID_MAX_LENGTH || password.length() >= PASSWORD_MAX_LENGTH || (!hasValidDeviceKey(deviceKey) || !hasValidDeviceId(deviceId))) {
+    server.send(400, "text/html; charset=utf-8", configurationPage("Confira o SSID, a senha, o identificador e a chave de cinco digitos."));
     return;
   }
-  saveConfiguration(ssid, password, deviceKey);
+  saveConfiguration(ssid, password, deviceKey, deviceId);
   server.send(200, "text/html; charset=utf-8", "<html><body><h2>Configuracao salva.</h2><p>O ESP sera reiniciado e iniciara a medicao.</p></body></html>");
   delay(1500);
   ESP.restart();
@@ -186,7 +201,7 @@ void processConfigurationPortal() {
 }
 
 void sendReading(float liters, float flowLpm) {
-  if (WiFi.status() != WL_CONNECTED || !hasValidDeviceKey(savedDeviceKey)) return;
+  if (WiFi.status() != WL_CONNECTED || !hasValidDeviceKey(savedDeviceKey) || !hasValidDeviceId(savedDeviceId)) return;
   BearSSL::WiFiClientSecure client;
   client.setInsecure(); // A API usa HTTPS; para validar o certificado, substitua por um trust anchor atualizado.
   HTTPClient http;
@@ -195,6 +210,7 @@ void sendReading(float liters, float flowLpm) {
     return;
   }
   http.addHeader("Content-Type", "application/json");
+  http.addHeader("X-Device-Id", savedDeviceId);
   http.addHeader("X-Device-Key", savedDeviceKey);
   const String payload = "{\"litros\":" + String(liters, 4) + ",\"fluxo\":" + String(flowLpm, 2) + ",\"intervalo_segundos\":" + String(MEASUREMENT_INTERVAL_MS / 1000) + "}";
   const int responseCode = http.POST(payload);

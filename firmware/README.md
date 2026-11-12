@@ -10,11 +10,17 @@ O arquivo `AquaAlertESP8266/AquaAlertESP8266.ino` reune a configuracao de Wi-Fi,
 
 ## Primeira configuracao
 
-1. Crie a conta no site e copie a **chave de cinco digitos do ESP**.
+1. Crie a conta no site e copie o **identificador do ESP** (`ESP-...`) e a **chave de cinco digitos** pela area Meu ESP, apos confirmar a senha.
 2. Com o ESP ligado, conecte o celular ou computador na rede `AquaAlert_Config`, senha `12345678`.
 3. A tela de login da rede deve abrir o portal automaticamente. Caso o celular nao a abra (essa decisao e do sistema operacional), acesse `http://192.168.4.1` no navegador.
-4. Informe o nome e a senha da sua rede Wi-Fi e a chave/ID numerico de cinco digitos entregue pelo site. O dispositivo reinicia, conecta e passa a enviar leituras a cada um minuto.
+4. Informe o nome e a senha da sua rede Wi-Fi e o identificador do ESP e a chave de cinco digitos entregues pelo site. Sao valores separados; preserve zeros iniciais da chave. O dispositivo reinicia, conecta e passa a enviar leituras a cada um minuto.
 
-O firmware envia os litros acumulados desde o ultimo envio confirmado para `POST /api/leituras`, uma vez por minuto, com a chave no cabecalho `X-Device-Key`. Se uma tentativa falhar, o volume fica pendente para o proximo envio.
+O firmware envia os litros acumulados desde o ultimo envio confirmado para `POST /api/leituras`, uma vez por minuto, com o identificador no cabecalho `X-Device-Id` e a chave no cabecalho `X-Device-Key`. Se uma tentativa falhar, o volume fica pendente para o proximo envio.
 
 `PULSES_PER_LITER` esta configurado como 450, valor aproximado do YF-S201. Calibre esse valor com uma quantidade conhecida de agua para maior precisao.
+
+Ao atualizar uma instalacao antiga sem identificador salvo, o ESP abre o portal novamente para completar a configuracao. Os enderecos da rede e da chave na EEPROM foram preservados; o identificador ocupa uma area adicional.
+
+Este exemplo aponta para a API Cloudflare publicada. As contas locais do Flask usam outros identificadores/chaves e precisam do endpoint do computador, conforme o [guia local](../contributing/DESENVOLVIMENTO.md). Nao use credenciais locais no endpoint de producao.
+
+O exemplo usa `setInsecure()` e **nao valida o certificado HTTPS**. Antes de usar fora de um ambiente de teste, configure um trust anchor atualizado no cliente BearSSL. A compilacao para a placa e o teste com sensor fisico devem ser feitos no Arduino IDE.

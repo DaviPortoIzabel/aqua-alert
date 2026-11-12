@@ -1,0 +1,27 @@
+:root{color-scheme:light}html[data-theme=dark]{color-scheme:dark;--primary:#b8d9f0;--secondary:#477da4;--accent:#94c5e5;--bg-light:#0b1723;--text-dark:#d1dfeb}
+html[data-theme=dark] body,html[data-theme=dark] .about-page{background:#0b1723;color:#c7d8e6}
+html[data-theme=dark] :is(.nav-container,.welcome-box,.dica-card,.member-card,.benefit-card,.content-card,.auth-card,.metric,.chart-card,.history-card,.settings,.story-card,.habit-card,.person-card,.bento-step,.practice-card){background:#142738;border-color:#294357;color:#c7d8e6;box-shadow:none}
+html[data-theme=dark] :is(h1,h2,h3,.journal h1,.navbar .logo a,.navbar .nav-links a[aria-current=page],.metric-value,.history-table th){color:#d3e8f8}
+html[data-theme=dark] :is(.nav-links,.navbar .nav-links a[aria-current=page],.economia,.device-card,.credential code,.article-expanded .takeaway,.featured-story,.bento-main,.practice-card:first-child,.practice-card:last-child){background:#1b3348;border-color:#35556e}
+html[data-theme=dark] :is(.navbar .nav-links a,.journal-heading>p,.featured-copy>p:not(.eyebrow),.story-body>p:not(.eyebrow),.article-expanded p,.intro-copy p,.project-flow>div>p:not(.eyebrow),.habit-card p,.flow-steps p,.value-item p,.metric-label,.chart-card p,.empty,.tips-intro>p,.practice-card>p,.practice-card details p,.method-intro>p:not(.section-label),.method-steps p,.bento-main>p:not(.section-label),.bento-step p,.section-heading>p,.journal-end p:not(.eyebrow)){color:#a6bdce}
+html[data-theme=dark] :is(.eyebrow,.section-label,.habit-category,.habit-number,.reading-time,.journal-toolbar>span,.team-portrait>p,.source-note,.status,.secondary-link){color:#9cb9cf}
+html[data-theme=dark] :is(.text-link,.story-body summary,.habit-card summary,.practice-card summary,.habit-choice,.inline-link,.journal-footer a,.about-footer a){color:#a8d0ee}
+html[data-theme=dark] :is(.about-main h2 span,.journal h1 span){color:#86b1d0}
+html[data-theme=dark] :is(.nav-container,.journal-footer,.about-footer,.flow-steps li,.value-item,.history-table th,.history-table td,.practice-card details,.method-steps li,.signal-path span){border-color:#355168}
+html[data-theme=dark] .navbar .nav-links a:hover{background:#29485f;color:#def0ff}
+html[data-theme=dark] :is(.auth-columns label,.password-recovery label){color:#bfd6e8}
+html[data-theme=dark] :is(.auth-columns input,.password-recovery input,.settings input){background:#0c1c2a;color:#e2edf5;border-color:#426078}
+html[data-theme=dark] .outline-button{background:#183247;color:#cbe3f6;border-color:#547994}
+html[data-theme=dark] .button:not(.primary){color:#c3def1;border-color:#6a91af}
+html[data-theme=dark] .account-panel,html[data-theme=dark] .account-dialog{background:#142738;border-color:#355168;color:#d2e5f3}
+html[data-theme=dark] :is(.account-panel button,.navbar .account-panel a,.account-dialog h2){color:#c6dfef}
+html[data-theme=dark] :is(.account-identity,.account-panel .account-signout){border-color:#355168}
+html[data-theme=dark] :is(.account-panel button:hover,.navbar .account-panel a:hover,.theme-label select,.account-field input,.account-dialog .account-close,.account-dialog .account-secondary){background:#1c354a;color:#cee6f6;border-color:#44657e}
+html[data-theme=dark] :is(.account-notice,.account-identity #account-email,.account-dialog form>p,.account-eyebrow){color:#a3bed2}
+html[data-theme=dark] .account-dialog .account-form-status{color:#94d6ba}html[data-theme=dark] .account-dialog .account-form-status.error,html[data-theme=dark] .status.error{color:#ff9aaf}
+html[data-theme=dark] .status.success{color:#94d6ba}html[data-theme=dark] .habit-choice:has(input:checked){color:#c5e6ff}
+html[data-theme=dark] .about-hero h1{color:#f6faff}html[data-theme=dark] .about-hero h1 em,html[data-theme=dark] .manifesto em{color:#88b9df}
+html[data-theme=dark] .navbar .nav-links a[aria-current=page]{background:#365d7b;color:#f5faff;box-shadow:inset 0 0 0 1px #7397b044}
+/* Preserve the new dashboard highlight and the open auth layout in dark mode. */
+html[data-theme=dark] .metrics .metric-feature{background:#204b6b;border-color:#3b6788}
+html[data-theme=dark] .auth-shell .auth-card{background:transparent;box-shadow:none}

@@ -38,3 +38,26 @@ CREATE TABLE IF NOT EXISTS password_reset_codes (
 );
 
 CREATE INDEX IF NOT EXISTS idx_password_reset_codes_user ON password_reset_codes(user_id, expires_at);
+
+CREATE TABLE IF NOT EXISTS user_settings (
+  user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  avatar TEXT,
+  theme TEXT NOT NULL DEFAULT 'system' CHECK (theme IN ('system', 'light', 'dark')),
+  auth_version INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS device_secrets (
+  device_id TEXT PRIMARY KEY REFERENCES devices(id) ON DELETE CASCADE,
+  encrypted_key TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS device_unlock_attempts (
+  user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  window_start INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS device_code_attempts (
+  device_id TEXT PRIMARY KEY REFERENCES devices(id) ON DELETE CASCADE,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  window_start INTEGER NOT NULL
+);
