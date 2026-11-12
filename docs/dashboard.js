@@ -68,6 +68,17 @@
     const style = $('#chartStyle').value;
     chart = new Chart(context, { type: style === 'bar' ? 'bar' : 'line', data: { labels: data.labels, datasets: [{ label: 'Consumo', data: data.values, borderColor: dark ? '#8dc0e5' : '#3e7da9', backgroundColor: style === 'bar' ? (dark ? '#5787aa' : '#a4c5df') : gradient, fill: style === 'area', borderWidth: 2, tension: style === 'step' ? 0 : .25, stepped: style === 'step', spanGaps: false, pointRadius: data.keys.length > 100 ? 1.5 : 3, pointHoverRadius: 6, borderRadius: 6, maxBarThickness: 50 }] }, options: { responsive: true, maintainAspectRatio: false, animation: matchMedia('(prefers-reduced-motion: reduce)').matches ? false : { duration: 300 }, interaction: { intersect: false, mode: 'index' }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: item => ` ${liters(item.parsed.y)}` } } }, scales: { x: { grid: { display: false }, border: { display: false }, ticks: { color: dark ? '#9bb6ca' : '#7d93a4', maxTicksLimit: 10, maxRotation: 0, font: { size: 10 } } }, y: { beginAtZero: true, border: { display: false }, ticks: { color: dark ? '#9bb6ca' : '#7d93a4', maxTicksLimit: 5, callback: value => `${number.format(value)} L`, font: { size: 10 } }, grid: { color: dark ? '#294253' : '#edf2f6' } } } } });
   }
+  function renderLeakAlert(alert) {
+    const box = $('#leakAlert'); box.hidden = !alert;
+    if (!alert) return;
+    const labels = { normal: 'Comparação semanal do consumo', media: 'Possibilidade média de vazamento', alta: 'Possibilidade alta de vazamento' };
+    const level = Object.hasOwn(labels, alert.level) ? alert.level : 'normal';
+    box.className = `leak-alert ${level}`;
+    $('#leakTitle').textContent = labels[level];
+    $('#leakDescription').textContent = alert.previous_total > 0
+      ? `Últimos 7 dias: ${liters(alert.current_total)}. Nos 7 anteriores: ${liters(alert.previous_total)}.${level !== 'normal' ? ` Aumento de ${number.format(alert.increase_percent)}%. Verifique possíveis vazamentos.` : ''}`
+      : `Últimos 7 dias: ${liters(alert.current_total)}. Sem consumo registrado nos 7 anteriores para calcular o aumento.`;
+  }
   async function load(start = selected?.start || $('#periodStart').value, end = selected?.end || $('#periodEnd').value) {
     if (!start || !end || start > end || end > today()) { $('#filterError').textContent = 'Escolha datas válidas, em ordem, até hoje.'; return; }
     if ((new Date(end) - new Date(start)) / 86400000 >= 3660) { $('#filterError').textContent = 'Escolha um período de até 10 anos.'; return; }
@@ -77,9 +88,10 @@
     $('#filterError').textContent = ''; $('#dashboardData').setAttribute('aria-busy', 'true'); $('#applyPeriod').disabled = true; $('#refreshButton').disabled = true;
     showStatus('Consultando seu consumo…');
     try {
-      const [profile, data] = await Promise.all([api('/api/me'), api(`/api/consumo/periodo?${new URLSearchParams({ start, end, granularity })}`)]);
+      const [profile, data, alert] = await Promise.all([api('/api/me'), api(`/api/consumo/periodo?${new URLSearchParams({ start, end, granularity })}`), api('/api/alertas/vazamento').catch(() => null)]);
       if (id !== requestId) return;
       selected = { start, end, granularity }; result = data; page = 1;
+      renderLeakAlert(alert);
       $('#userName').textContent = profile.user.name; $('#deviceName').textContent = profile.device.name;
       $('#periodTotal').textContent = liters(data.summary.total_liters);
       $('#periodAverage').textContent = data.summary.average_liters === null ? '—' : liters(data.summary.average_liters);
