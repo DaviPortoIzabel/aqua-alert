@@ -28,6 +28,7 @@ flowchart LR
 | Funções compartilhadas das páginas | `docs/app.js`; inicialização de tema em `docs/theme-init.js` |
 | Conteúdo público | `docs/index.html`, `docs/sobre.html`, `docs/dicas.html`, `docs/artigos.html` |
 | Rotas HTTP | Despacho por método e caminho no final de `api/src/index.js` |
+| Execução local Flask | `app.py`, `local_app/`, `templates/local/page.html`, `requirements.txt` e `tests/test_flask.py` |
 | Banco | `api/schema.sql`, `api/migrations/` e binding `DB` em `api/wrangler.toml` |
 | Exemplos de hardware | Arquivos `codigo_arduino.txt`, `código arduino.txt` e `codigo_wifi.txt`; confira a compatibilidade com a [API atual](../api/README.md) antes de gravar no ESP |
 
@@ -47,4 +48,14 @@ flowchart LR
 
 `schema.sql` representa o estado de um banco novo. Ao mudar a estrutura, prepare uma migration para bancos existentes e atualize o schema consolidado. Explique no PR a ordem de aplicação e publicação. Antes de executar migrations em produção, leia cada SQL e confira o estado do banco: arquivos antigos não devem ser reaplicados indiscriminadamente.
 
-O Flask/MySQL é uma implementação anterior independente. Alterar suas páginas não muda o site publicado pelo GitHub Pages.
+## Execução local com Python
+
+`app.py` inicia o Flask; `local_app/__init__.py` configura o SQLite, as páginas e os arquivos públicos; `local_app/api.py` implementa as mesmas rotas consumidas pela interface. `local_app/security.py` concentra sessões assinadas, autorização temporária do ESP, cifragem das chaves e reserva atômica de tentativas.
+
+O Flask usa `templates/local/page.html` para incluir as páginas atuais de `docs/`, com um prefixo de loader que evita conflito com os templates antigos. O template injeta uma meta de configuração: presente, ela faz `docs/account.js` consultar a API na mesma origem; ausente, o JavaScript mantém a API Cloudflare publicada. Nenhuma escolha de backend depende apenas de o endereço ser localhost.
+
+O banco e o segredo ficam em `instance/`, sem compartilhar dados ou credenciais com produção. Não há importação automática do MySQL antigo ou do D1. O schema inicial é compartilhado, mas os formatos de hash de senha são próprios de cada backend; não copie usuários entre bancos sem preparar uma migração explícita.
+
+Os templates antigos fora de `templates/local/` e os arquivos de `static/` permanecem como referência histórica. Não são usados para montar a interface atual. Os arquivos CSS, JavaScript e imagens vêm de `docs/` nos dois modos.
+
+Para mudar o contrato de uma rota usada pelo painel, atualize as duas implementações e execute as suítes compartilhadas contra ambas. Mudanças só no Python não alteram o backend publicado.

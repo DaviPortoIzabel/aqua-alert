@@ -1,6 +1,6 @@
 # Publicação do Aqua Alert
 
-O site usa GitHub Pages; a API usa Cloudflare Workers e D1. Para desenvolver sem publicar, veja o [guia local](contributing/DESENVOLVIMENTO.md).
+O site publicado usa GitHub Pages; a API publicada usa Cloudflare Workers e D1. A execução local em Python/Flask é independente e não precisa ser publicada para o Pages funcionar. Para desenvolver sem publicar, veja o [guia local](contributing/DESENVOLVIMENTO.md).
 
 ## 1. Preparar e publicar a API
 

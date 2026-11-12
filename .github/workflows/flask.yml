@@ -1,0 +1,42 @@
+name: Testes Flask
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  flask:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Instalar dependências Python
+        run: python -m pip install -r requirements.txt
+      - name: Testar páginas, persistência e recuperação de senha
+        run: python -m unittest discover -s tests -v
+      - name: Verificar contrato compartilhado da API
+        shell: bash
+        env:
+          API_TEST_BASE: http://127.0.0.1:5000
+        run: |
+          python app.py > /tmp/aqua-alert-flask.log 2>&1 &
+          flask_pid=$!
+          trap 'kill "$flask_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent "$API_TEST_BASE/health" > /dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl --fail --silent "$API_TEST_BASE/health"
+          node --test api/tests/*.test.mjs

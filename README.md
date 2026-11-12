@@ -29,25 +29,49 @@ api/            API Cloudflare Workers, schema D1, migrations e testes
 docs/           Site estático publicado pelo GitHub Pages
 contributing/   Guias para desenvolvedores (não fazem parte do site)
 .github/        Modelos de issues e pull requests
-app.py          Implementação Flask/MySQL anterior
-templates/      Páginas da implementação Flask
-static/         Estilos e scripts da implementação Flask
+app.py          Entrada da execução local em Python/Flask
+local_app/      API Python, autenticação e banco SQLite local
+templates/local/ Integração Flask com as páginas atuais de docs/
+static/         Arquivos históricos da implementação anterior
+requirements.txt Dependências Python para rodar no computador
+tests/          Testes da execução Flask
 codigo*.txt     Referências de firmware Arduino/ESP8266
 ```
 
-A aplicação publicada usa **`docs/` + `api/`**. O Flask é uma implementação separada, com banco e rotas próprios; ele não é necessário para desenvolver o painel atual. A pasta `docs/` contém o site servido ao público: a documentação técnica fica em `contributing/`.
+O site publicado continua usando **GitHub Pages + Cloudflare Workers/D1**. Quem baixa o projeto pode usar **Flask + SQLite no próprio computador**, com a mesma interface e dados independentes. O Flask inclui os HTMLs de `docs/` por meio de `templates/local/page.html`, sem duplicar as páginas. Os templates antigos e `static/` ficam como referência histórica.
 
-## Desenvolvimento rápido
+## Rodar no computador com Flask
 
-Pré-requisitos: Git, Python 3 para servir arquivos estáticos e Node.js 22 ou superior com npm para a API e os testes.
+Instale Python **3.10 ou superior**. Não é necessário MySQL, Node.js nem conta Cloudflare para executar a versão local.
 
 ```sh
 git clone https://github.com/DaviPortoIzabel/aqua-alert.git
 cd aqua-alert
-python3 -m http.server 8080 --directory docs --bind 127.0.0.1
+python -m venv .venv
 ```
 
-Abra `http://127.0.0.1:8080`. **Por padrão, o site aponta para a API publicada.** Antes de cadastrar contas ou enviar dados em desenvolvimento, siga o [guia local](contributing/DESENVOLVIMENTO.md) para conectar o site à sua API e ao banco local.
+Ative o ambiente virtual:
+
+```sh
+# Windows (PowerShell)
+.venv\Scripts\Activate.ps1
+
+# Linux/macOS
+source .venv/bin/activate
+```
+
+Depois:
+
+```sh
+python -m pip install -r requirements.txt
+python app.py
+```
+
+Abra **http://127.0.0.1:5000** e crie uma conta local. Em Linux/macOS, use `python3` para criar o ambiente caso `python` não esteja disponível.
+
+O SQLite e o segredo da aplicação são criados automaticamente em `instance/`, ignorado pelo Git. Cadastros e leituras locais não vão para o site publicado. Preserve essa pasta para manter seus dados e as chaves legíveis após reiniciar.
+
+A recuperação de senha por e-mail requer configuração do Brevo. Veja [desenvolvimento local](contributing/DESENVOLVIMENTO.md) para configurar o envio, conectar um ESP, rodar testes ou desenvolver a API Cloudflare.
 
 ## Contribuições
 
