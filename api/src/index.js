@@ -276,7 +276,12 @@ async function postReading(request, env) {
   if (!deviceKey) return unauthorized();
   let device;
   if (/^\d{5}$/.test(deviceKey)) {
-    const deviceId = request.headers.get("X-Device-Id") || body.device_id;
+    // Opt-in para um único ESP antigo. Nunca procura uma chave entre outras contas.
+    // Um identificador explícito, mesmo inválido, não usa o fallback.
+    const hasDeviceId = request.headers.has("X-Device-Id") || Object.hasOwn(body, "device_id");
+    const deviceId = hasDeviceId
+      ? request.headers.get("X-Device-Id") || body.device_id
+      : env.LEGACY_DEVICE_ID;
     if (!validDeviceId(deviceId)) return json({ error: "Envie o identificador do ESP junto da chave de 5 números." }, 400);
     const stored = await env.DB.prepare("SELECT id, device_key_hash FROM devices WHERE id = ?").bind(deviceId).first();
     if (!stored) return unauthorized();

@@ -293,6 +293,10 @@ def post_reading():
     data = body()
     key = request.headers.get("X-Device-Key", "")
     device_id = request.headers.get("X-Device-Id") or data.get("device_id")
+    # Compatibilidade opt-in: vincula o envio sem ID a somente um ESP conhecido.
+    if ("X-Device-Id" not in request.headers and "device_id" not in data
+            and re.fullmatch(r"[0-9]{5}", key)):
+        device_id = current_app.config.get("LEGACY_DEVICE_ID")
     if not key:
         abort(401, "Informe a chave do dispositivo.")
     if not isinstance(device_id, str) or not re.fullmatch(r"[A-Z0-9-]{6,64}", device_id):

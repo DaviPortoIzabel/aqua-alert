@@ -109,6 +109,34 @@ class FlaskLocalTests(unittest.TestCase):
         for endpoint in ("hoje", "diario", "semanal"):
             self.assertEqual(self.client.get("/api/consumo/" + endpoint, headers=self.auth(account)).status_code, 200)
 
+    def test_legacy_device_is_opt_in_and_never_overrides_an_explicit_id(self):
+        account = self.register()
+        other = self.register("other@example.test")
+        key = {"X-Device-Key": account["device"]["api_key"]}
+        data = {"litros": 2.4111, "fluxo": 2.41, "intervalo_segundos": 60}
+        self.assertEqual(self.client.post("/api/leituras", headers=key, json=data).status_code, 400)
+        self.app.config["LEGACY_DEVICE_ID"] = account["device"]["id"]
+        self.assertEqual(self.client.post("/api/leituras", headers=key, json=data).status_code, 201)
+        for explicit in ({"device_id": None}, {"device_id": "invalid"}, {"device_id": other["device"]["id"]}):
+            self.assertIn(self.client.post("/api/leituras", headers=key, json={**data, **explicit}).status_code, (400, 401))
+        self.assertEqual(self.client.post("/api/leituras", headers={**key, "X-Device-Id": ""}, json=data).status_code, 400)
+        self.assertEqual(self.client.post("/api/leituras", headers={"X-Device-Key": other["device"]["api_key"],
+                                                                 "X-Device-Id": other["device"]["id"]}, json=data).status_code, 201)
+        with sqlite3.connect(self.config["DATABASE"]) as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM readings WHERE device_id = ?", (account["device"]["id"],)).fetchone()[0], 1)
+        self.app.config["LEGACY_DEVICE_ID"] = None
+        self.assertEqual(self.client.post("/api/leituras", headers=key, json=data).status_code, 400)
+
+    def test_legacy_attempts_and_explicit_id_share_the_same_limit(self):
+        account = self.register()
+        self.app.config["LEGACY_DEVICE_ID"] = account["device"]["id"]
+        wrong = "00000" if account["device"]["api_key"] != "00000" else "00001"
+        for _ in range(5):
+            self.assertEqual(self.client.post("/api/leituras", headers={"X-Device-Key": wrong}, json={"litros": 1}).status_code, 401)
+        for extra in ({}, {"X-Device-Id": account["device"]["id"]}):
+            self.assertEqual(self.client.post("/api/leituras", headers={"X-Device-Key": account["device"]["api_key"], **extra},
+                                             json={"litros": 1}).status_code, 429)
+
     def test_invalid_json_and_tampered_session_do_not_cause_server_errors(self):
         account = self.register()
         for payload in ([], None, {"email": []}, {"name": 1, "email": {}, "password": True}):

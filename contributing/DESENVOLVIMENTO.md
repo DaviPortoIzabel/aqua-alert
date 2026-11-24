@@ -23,6 +23,7 @@ Abra **http://127.0.0.1:5000**. O Flask serve as mesmas páginas do Pages e inje
 - `instance/auth-secret`: segredo aleatório criado na primeira execução. Preserve-o junto com o banco; removê-lo invalida sessões e impede recuperar chaves cifradas com ele.
 - `AUTH_SECRET`: variável de ambiente opcional para definir um segredo próprio (mínimo de 32 caracteres). Use sempre o mesmo valor entre execuções.
 - `AQUA_DATABASE`: caminho opcional para outro arquivo SQLite. Preserve também o segredo correspondente.
+- `LEGACY_DEVICE_ID`: opcional; associa envios sem identificador a um único ESP antigo da base local, mantendo validação de chave e limite de tentativas. Veja a [compatibilidade da API](../api/README.md#esp-antigo-sem-identificador-no-envio).
 
 Esses arquivos privados não devem ser enviados ao GitHub. Faça o backup do banco com o aplicativo parado e guarde banco e segredo juntos em local privado. As contas do site publicado não são importadas automaticamente; crie uma conta local.
 
@@ -132,6 +133,7 @@ Os testes fazem requisições HTTP e criam dados no banco local; não são teste
 | `account.test.mjs` | Perfil, foto, tema, isolamento e revogação de sessões |
 | `range.test.mjs` | Datas inclusivas, horário de São Paulo, agregações e filtros inválidos |
 | `device-access.test.mjs` | Confirmação de senha, autorização temporária e rotação de chave |
+| `legacy-device.test.mjs` | Compatibilidade opt-in no Worker com SQLite temporário, isolamento e limite de tentativas |
 | `short-code.test.mjs` | Códigos de cinco dígitos, identificador do ESP e bloqueio de tentativas |
 
 Para alterações visuais, confira também navegação por teclado, telas pequenas, estados de carregamento/erro e os três temas. Registre no PR o que foi verificado.
