@@ -416,3 +416,20 @@ def history():
                             "MAX(measured_at) AS ultima_atualizacao FROM readings WHERE device_id = ? "
                             "GROUP BY dia ORDER BY dia DESC LIMIT 90", (device["id"],)).fetchall()
     return jsonify([dict(row) for row in rows])
+
+
+@api.get("/api/alertas/vazamento")
+def leak_alert():
+    _, device = require_device()
+    today = now_local().date()
+    totals = get_db().execute(
+        "SELECT COALESCE(SUM(CASE WHEN substr(measured_at, 1, 10) BETWEEN ? AND ? THEN liters ELSE 0 END), 0) AS current_total, "
+        "COALESCE(SUM(CASE WHEN substr(measured_at, 1, 10) BETWEEN ? AND ? THEN liters ELSE 0 END), 0) AS previous_total "
+        "FROM readings WHERE device_id = ?",
+        (str(today - timedelta(days=6)), str(today), str(today - timedelta(days=13)),
+         str(today - timedelta(days=7)), device["id"])).fetchone()
+    current, previous = totals["current_total"], totals["previous_total"]
+    increase = (current - previous) / previous * 100 if previous > 0 else 0
+    level = "alta" if increase > 80 else "media" if increase >= 40 else "normal"
+    return jsonify(level=level, increase_percent=max(0, round(increase, 1)),
+                   current_total=round(current, 2), previous_total=round(previous, 2))

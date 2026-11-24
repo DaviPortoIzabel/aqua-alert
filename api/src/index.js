@@ -324,6 +324,18 @@ async function dashboardWeekly(request, env) {
   return json({ labels: rows.results.map((row) => `${row.dia.slice(8, 10)}/${row.dia.slice(5, 7)}`), valores: rows.results.map((row) => Number(row.total)) });
 }
 
+// Compara duas janelas de 7 dias no calendário de São Paulo.
+async function leakAlert(request, env) {
+  const result = await requireDevice(request, env); if (result.response) return result.response;
+  const today = dateKey(new Date());
+  const daysBefore = (days) => { const value = new Date(`${today}T12:00:00Z`); value.setUTCDate(value.getUTCDate() - days); return value.toISOString().slice(0, 10); };
+  const totals = await env.DB.prepare("SELECT COALESCE(SUM(CASE WHEN substr(measured_at, 1, 10) BETWEEN ? AND ? THEN liters ELSE 0 END), 0) AS current_total, COALESCE(SUM(CASE WHEN substr(measured_at, 1, 10) BETWEEN ? AND ? THEN liters ELSE 0 END), 0) AS previous_total FROM readings WHERE device_id = ?").bind(daysBefore(6), today, daysBefore(13), daysBefore(7), result.device.id).first();
+  const currentTotal = Number(totals.current_total); const previousTotal = Number(totals.previous_total);
+  const increasePercent = previousTotal > 0 ? ((currentTotal - previousTotal) / previousTotal) * 100 : 0;
+  const level = increasePercent > 80 ? "alta" : increasePercent >= 40 ? "media" : "normal";
+  return json({ level, increase_percent: Math.max(0, Number(increasePercent.toFixed(1))), current_total: Number(currentTotal.toFixed(2)), previous_total: Number(previousTotal.toFixed(2)) });
+}
+
 async function history(request, env) {
   const result = await requireDevice(request, env); if (result.response) return result.response;
   const rows = await env.DB.prepare("SELECT substr(measured_at, 1, 10) AS dia, ROUND(SUM(liters), 3) AS total_litros, MAX(measured_at) AS ultima_atualizacao FROM readings WHERE device_id = ? GROUP BY dia ORDER BY dia DESC LIMIT 90").bind(result.device.id).all();
@@ -388,6 +400,7 @@ export default { async fetch(request, env) {
   if (request.method === "GET" && path === "/api/consumo/hoje") return dashboardToday(request, env);
   if (request.method === "GET" && path === "/api/consumo/diario") return dashboardDaily(request, env);
   if (request.method === "GET" && path === "/api/consumo/semanal") return dashboardWeekly(request, env);
+  if (request.method === "GET" && path === "/api/alertas/vazamento") return leakAlert(request, env);
   if (request.method === "GET" && path === "/api/historico") return history(request, env);
   return json({ error: "Rota não encontrada." }, 404);
 } };
