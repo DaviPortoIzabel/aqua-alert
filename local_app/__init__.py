@@ -28,6 +28,7 @@ def create_app(config=None):
     app.config.from_mapping(
         DATABASE=os.environ.get("AQUA_DATABASE", str(Path(app.instance_path) / "aqua-alert.sqlite3")),
         AUTH_SECRET=os.environ.get("AUTH_SECRET"),
+        LEGACY_DEVICE_ID=os.environ.get("LEGACY_DEVICE_ID"),
         BREVO_API_KEY=os.environ.get("BREVO_API_KEY"),
         BREVO_SENDER_EMAIL=os.environ.get("BREVO_SENDER_EMAIL"),
         BREVO_SENDER_NAME=os.environ.get("BREVO_SENDER_NAME", "Aqua Alert"),

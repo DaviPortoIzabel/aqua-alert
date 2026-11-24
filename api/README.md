@@ -202,6 +202,16 @@ wrangler deploy
 Essa migration apenas adiciona o controle de tentativas dos sensores. Ela não
 altera chaves, dispositivos ou leituras existentes.
 
+## ESP antigo sem identificador no envio
+
+Para manter um ESP já gravado que envia somente `X-Device-Key`, existe a configuração opcional `LEGACY_DEVICE_ID`. Defina no Worker o identificador exato de **um único dispositivo** cuja chave de cinco dígitos já esteja cadastrada. O envio pode continuar com o JSON antigo (`litros`, `fluxo`, `intervalo_segundos`) e sem `X-Device-Id`.
+
+A compatibilidade fica desativada quando a variável não é definida. O servidor não pesquisa chaves entre contas: vincula a requisição sem ID somente ao dispositivo configurado, valida a chave HMAC e aplica o mesmo limite atômico de cinco erros por dez minutos. Um identificador informado explicitamente, mesmo inválido, nunca é substituído pelo configurado. Chaves renovadas invalidam as anteriores normalmente.
+
+Configure a variável somente após conferir qual ESP deve receber esse tratamento. Não renove a chave do dispositivo se não puder atualizar sua configuração. Se ele enviar uma chave anterior à cadastrada, a compatibilidade não a reativa. Remova a variável para desativar o modo. Instalações com vários ESPs antigos sem identificador precisam de uma estratégia própria; não é seguro associá-los só pela coincidência de códigos curtos.
+
+No Flask, a mesma variável é lida do ambiente antes de iniciar `python app.py`. Ela aponta para um dispositivo da base **local**, independente da produção. Não há migration ou alteração de firmware necessária para esse modo.
+
 ## Comparação semanal e possível vazamento
 
 `GET /api/alertas/vazamento` exige sessão e respeita o dispositivo da conta. Compara os últimos sete dias (incluindo hoje) com os sete anteriores no calendário de São Paulo. Retorna `current_total`, `previous_total`, `increase_percent` e `level`: `normal` abaixo de 40%, `media` de 40% a 80% e `alta` acima de 80%. Percentuais negativos são apresentados como zero. Sem consumo anterior, o percentual é zero e a interface informa que não há base para calcular o aumento.
