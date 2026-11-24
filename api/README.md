@@ -27,6 +27,7 @@ As rotas autenticadas usam `Authorization: Bearer SEU_TOKEN`. Cada sessão enxer
 | POST | `/api/account` | atualizar perfil, foto e tema |
 | POST | `/api/account/password` | trocar senha e revogar sessões anteriores |
 | GET | `/api/consumo/periodo` | consumo por intervalo e granularidade |
+| GET | `/api/alertas/vazamento` | comparação dos últimos 7 dias com os 7 anteriores |
 | POST | `/api/dispositivos/acesso` | confirmar senha e liberar acesso temporário ao ESP |
 | POST | `/api/dispositivos/chave` | renovar chave com sessão e `X-Device-Access` |
 
@@ -210,3 +211,9 @@ A compatibilidade fica desativada quando a variável não é definida. O servido
 Configure a variável somente após conferir qual ESP deve receber esse tratamento. Não renove a chave do dispositivo se não puder atualizar sua configuração. Se ele enviar uma chave anterior à cadastrada, a compatibilidade não a reativa. Remova a variável para desativar o modo. Instalações com vários ESPs antigos sem identificador precisam de uma estratégia própria; não é seguro associá-los só pela coincidência de códigos curtos.
 
 No Flask, a mesma variável é lida do ambiente antes de iniciar `python app.py`. Ela aponta para um dispositivo da base **local**, independente da produção. Não há migration ou alteração de firmware necessária para esse modo.
+
+## Comparação semanal e possível vazamento
+
+`GET /api/alertas/vazamento` exige sessão e respeita o dispositivo da conta. Compara os últimos sete dias (incluindo hoje) com os sete anteriores no calendário de São Paulo. Retorna `current_total`, `previous_total`, `increase_percent` e `level`: `normal` abaixo de 40%, `media` de 40% a 80% e `alta` acima de 80%. Percentuais negativos são apresentados como zero. Sem consumo anterior, o percentual é zero e a interface informa que não há base para calcular o aumento.
+
+A comparação é independente do filtro do gráfico e não confirma um vazamento. O endpoint também existe no Flask local. Não exige migration. Se a API publicada ainda não oferecer a rota, o painel continua mostrando consumo e histórico sem a comparação.

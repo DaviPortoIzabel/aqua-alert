@@ -134,6 +134,7 @@ Os testes fazem requisições HTTP e criam dados no banco local; não são teste
 | `range.test.mjs` | Datas inclusivas, horário de São Paulo, agregações e filtros inválidos |
 | `device-access.test.mjs` | Confirmação de senha, autorização temporária e rotação de chave |
 | `legacy-device.test.mjs` | Compatibilidade opt-in no Worker com SQLite temporário, isolamento e limite de tentativas |
+| `leak-alert.test.mjs` | Comparação semanal, limiares, datas e isolamento entre contas |
 | `short-code.test.mjs` | Códigos de cinco dígitos, identificador do ESP e bloqueio de tentativas |
 
 Para alterações visuais, confira também navegação por teclado, telas pequenas, estados de carregamento/erro e os três temas. Registre no PR o que foi verificado.
